@@ -13,7 +13,8 @@ type Agent struct {
 	Level             int64
 	DiscountBP        int64
 	RebateBP          int64
-	MonthlyQuotaCents int64
+	MonthlyQuotaCents int64 // 旧字段，保留兼容
+	QuotaCents        int64 // 当前可用额度（-1 = 不限）
 	PassHash          string
 	TotpSecret        string
 	Status            string // active | frozen
@@ -21,22 +22,22 @@ type Agent struct {
 	FrozenAt          sql.NullInt64
 }
 
-const agentCols = `id, name, parent_id, level, discount_bp, rebate_bp, monthly_quota_cents,
+const agentCols = `id, name, parent_id, level, discount_bp, rebate_bp, monthly_quota_cents, quota_cents,
   pass_hash, COALESCE(totp_secret,''), status, created_at, frozen_at`
 
 func scanAgent(sc interface{ Scan(...any) error }) (Agent, error) {
 	var a Agent
 	err := sc.Scan(&a.ID, &a.Name, &a.ParentID, &a.Level, &a.DiscountBP, &a.RebateBP,
-		&a.MonthlyQuotaCents, &a.PassHash, &a.TotpSecret, &a.Status, &a.CreatedAt, &a.FrozenAt)
+		&a.MonthlyQuotaCents, &a.QuotaCents, &a.PassHash, &a.TotpSecret, &a.Status, &a.CreatedAt, &a.FrozenAt)
 	return a, err
 }
 
 func (s *Store) CreateAgent(ctx context.Context, a Agent) (int64, error) {
 	res, err := s.db.ExecContext(ctx,
-		`INSERT INTO agents(name, parent_id, level, discount_bp, rebate_bp, monthly_quota_cents,
+		`INSERT INTO agents(name, parent_id, level, discount_bp, rebate_bp, monthly_quota_cents, quota_cents,
 		   pass_hash, totp_secret, status, created_at)
-		 VALUES(?,?,?,?,?,?,?,NULLIF(?, ''),?,?)`,
-		a.Name, a.ParentID, a.Level, a.DiscountBP, a.RebateBP, a.MonthlyQuotaCents,
+		 VALUES(?,?,?,?,?,?,?,?,NULLIF(?, ''),?,?)`,
+		a.Name, a.ParentID, a.Level, a.DiscountBP, a.RebateBP, a.MonthlyQuotaCents, a.QuotaCents,
 		a.PassHash, a.TotpSecret, a.Status, a.CreatedAt)
 	if err != nil {
 		if isUniqueViolation(err) {
@@ -111,8 +112,8 @@ func (s *Store) ChildAgentIDs(ctx context.Context, agentID int64) ([]int64, erro
 
 func (s *Store) UpdateAgentPricing(ctx context.Context, id, discountBP, rebateBP, quotaCents int64) error {
 	_, err := s.db.ExecContext(ctx,
-		`UPDATE agents SET discount_bp = ?, rebate_bp = ?, monthly_quota_cents = ? WHERE id = ?`,
-		discountBP, rebateBP, quotaCents, id)
+		`UPDATE agents SET discount_bp = ?, rebate_bp = ?, monthly_quota_cents = ?, quota_cents = ? WHERE id = ?`,
+		discountBP, rebateBP, quotaCents, quotaCents, id)
 	return err
 }
 

@@ -32,26 +32,16 @@ func (s *Server) agentSummary(w http.ResponseWriter, r *http.Request) {
 	online, _ := s.st.CountSessionsByAgents(ctx, ids, now.Unix())
 	subs, _ := s.st.ListAgents(ctx, c.Agent.ID)
 
-	// -1 = 不限；0 及以上为真实剩余
-	remaining := int64(-1)
-	if c.Agent.MonthlyQuotaCents >= 0 {
-		remaining = c.Agent.MonthlyQuotaCents - used
-		if remaining < 0 {
-			remaining = 0
-		}
-	}
-
 	writeData(w, map[string]any{
-		"name":                c.Agent.Name,
-		"level":               c.Agent.Level,
-		"discount_bp":         c.Agent.DiscountBP,
-		"monthly_quota_cents": c.Agent.MonthlyQuotaCents,
-		"month_used_cents":    used,
-		"month_remaining":     remaining,
-		"cards":               cardCount,
-		"online":              online,
-		"subagents":           len(subs),
-		"server_time":         now.Unix(),
+		"name":             c.Agent.Name,
+		"level":            c.Agent.Level,
+		"quota_cents":      c.Agent.QuotaCents,
+		"month_used_cents": used,
+		"month_remaining":  c.Agent.QuotaCents,
+		"cards":            cardCount,
+		"online":           online,
+		"subagents":        len(subs),
+		"server_time":      now.Unix(),
 	})
 }
 

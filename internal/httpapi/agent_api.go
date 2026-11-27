@@ -414,7 +414,7 @@ func agentJSON(a store.Agent) map[string]any {
 	return map[string]any{
 		"id": a.ID, "name": a.Name, "parent_id": parent, "level": a.Level,
 		"discount_bp": a.DiscountBP, "rebate_bp": a.RebateBP,
-		"monthly_quota_cents": a.MonthlyQuotaCents, "status": a.Status,
+		"quota_cents": a.QuotaCents, "monthly_quota_cents": a.MonthlyQuotaCents, "status": a.Status,
 		"created_at": a.CreatedAt, "frozen_at": frozen,
 	}
 }
@@ -464,8 +464,10 @@ func (s *Server) createAgent(w http.ResponseWriter, r *http.Request) {
 
 	a := store.Agent{
 		Name: req.Name, Level: 1, DiscountBP: req.DiscountBP,
-		RebateBP: req.RebateBP, MonthlyQuotaCents: req.MonthlyQuotaCents,
-		PassHash: hash, Status: "active", CreatedAt: s.now().Unix(),
+		RebateBP:          req.RebateBP,
+		MonthlyQuotaCents: req.MonthlyQuotaCents,
+		QuotaCents:        req.MonthlyQuotaCents,
+		PassHash:          hash, Status: "active", CreatedAt: s.now().Unix(),
 	}
 	if req.ParentID > 0 {
 		parent, err := s.st.AgentByID(ctx, req.ParentID)
@@ -602,4 +604,58 @@ func (s *Server) settleBill(w http.ResponseWriter, r *http.Request) {
 	c := adminFrom(r)
 	_ = s.writeAudit(r.Context(), c, "agent_bill.settle", fmt.Sprintf("bill:%d", id), "", `{"status":"settled"}`, clientIP(r))
 	writeData(w, map[string]any{"id": id, "status": "settled"})
+}
+
+// agentQuotaTopup 给代理加/扣额度并记流水。
+func (s *Server) agentQuotaTopup(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	id, ok := pathID(r)
+	if !ok {
+		writeErr(w, http.StatusBadRequest, CodeBadInput, "id 不合法")
+		return
+	}
+	a, err := s.st.AgentByID(ctx, id)
+	if err != nil {
+		writeErr(w, http.StatusNotFound, CodeBadInput, "代理不存在")
+		return
+	}
+	var req struct {
+		DeltaCents int64  `json:"delta_cents"`
+		Note       string `json:"note"`
+	}
+	if !decode(w, r, &req) {
+		return
+	}
+	if req.DeltaCents == 0 {
+		writeErr(w, http.StatusBadRequest, CodeBadInput, "金额不能为 0")
+		return
+	}
+	if a.QuotaCents < 0 {
+		writeErr(w, http.StatusBadRequest, CodeBadInput, "该代理是不限额，先把额度设成具体数字再加减")
+		return
+	}
+	newQuota, err := s.st.AddAgentQuota(ctx, id, req.DeltaCents)
+	if err != nil {
+		internalErr(w, s.log, "调整额度失败", err)
+		return
+	}
+	if newQuota < 0 {
+		// 不允许扣成负数，回滚
+		_, _ = s.st.AddAgentQuota(ctx, id, -req.DeltaCents)
+		writeErr(w, http.StatusBadRequest, CodeBadInput, "扣减后额度会变成负数")
+		return
+	}
+	kind := "topup"
+	if req.DeltaCents < 0 {
+		kind = "adjust"
+	}
+	tx, err := s.st.DB().BeginTx(ctx, nil)
+	if err == nil {
+		_ = s.st.AddAgentLedgerTx(ctx, tx, id, kind, -req.DeltaCents, req.Note, s.now().Unix())
+		_ = tx.Commit()
+	}
+	c := adminFrom(r)
+	_ = s.writeAudit(ctx, c, "agent.quota_topup", fmt.Sprintf("agent:%d", id),
+		fmt.Sprintf(`{"quota":%d}`, a.QuotaCents), fmt.Sprintf(`{"quota":%d,"note":%q}`, newQuota, req.Note), clientIP(r))
+	writeData(w, map[string]any{"id": id, "quota_cents": newQuota})
 }

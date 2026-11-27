@@ -16,6 +16,7 @@ interface Agent {
   discount_bp: number
   rebate_bp: number
   monthly_quota_cents: number
+  quota_cents: number
   status: string
   created_at: number
 }
@@ -30,6 +31,9 @@ const showCreate = ref(false)
 const createForm = ref({ name: '', password: '', quotaYuan: 0 })
 const busy = ref(false)
 
+const quotaTarget = ref<Agent | null>(null)
+const quotaForm = ref({ amountYuan: 100, note: '' })
+
 const editTarget = ref<Agent | null>(null)
 const editForm = ref({ quotaYuan: 0 })
 
@@ -42,27 +46,28 @@ const columns: DataTableColumns<Agent> = [
   { title: '代理名', key: 'name' },
   { title: '层级', key: 'level', width: 70, render: (r) => `L${r.level}` },
   {
-    title: '月额度',
-    key: 'monthly_quota_cents',
-    width: 120,
+    title: '额度',
+    key: 'quota_cents',
+    width: 130,
     render: (r) =>
-      r.monthly_quota_cents < 0
+      r.quota_cents < 0
         ? '不限'
-        : r.monthly_quota_cents === 0
+        : r.quota_cents === 0
           ? '0（不能出卡）'
-          : `${formatYuan(r.monthly_quota_cents)} 元`,
+          : `${formatYuan(r.quota_cents)} 元`,
   },
   { title: '状态', key: 'status', width: 80, render: (r) => statusTag(r.status) },
   { title: '创建', key: 'created_at', width: 150, render: (r) => formatTs(r.created_at) },
   {
     title: '操作',
     key: 'op',
-    width: 190,
+    width: 260,
     render: (r) =>
       h(NSpace, { size: 4 }, {
         default: () => [
           h(NButton, { size: 'tiny', onClick: () => router.push(`/agents/${r.id}`) }, { default: () => '价格表' }),
-          h(NButton, { size: 'tiny', onClick: () => openEdit(r) }, { default: () => '改额度' }),
+          h(NButton, { size: 'tiny', type: 'primary', onClick: () => openQuota(r) }, { default: () => '加额度' }),
+          h(NButton, { size: 'tiny', onClick: () => openEdit(r) }, { default: () => '设额度' }),
           h(NButton, {
             size: 'tiny',
             type: r.status === 'active' ? 'error' : 'success',
@@ -108,7 +113,7 @@ async function create() {
 
 function openEdit(a: Agent) {
   editTarget.value = a
-  editForm.value = { quotaYuan: a.monthly_quota_cents / 100 }
+  editForm.value = { quotaYuan: a.quota_cents / 100 }
 }
 
 async function saveEdit() {
@@ -121,6 +126,30 @@ async function saveEdit() {
     })
     notice.value = '已更新代理策略'
     editTarget.value = null
+    await load()
+  } catch (e) {
+    err.value = (e as Error).message
+  } finally {
+    busy.value = false
+  }
+}
+
+function openQuota(a: Agent) {
+  quotaTarget.value = a
+  quotaForm.value = { amountYuan: 100, note: '' }
+}
+
+async function addQuota() {
+  if (!quotaTarget.value) return
+  err.value = ''
+  busy.value = true
+  try {
+    await api.post(`/admin/api/agents/${quotaTarget.value.id}/quota`, {
+      delta_cents: Math.round(quotaForm.value.amountYuan * 100),
+      note: quotaForm.value.note,
+    })
+    notice.value = '额度已调整'
+    quotaTarget.value = null
     await load()
   } catch (e) {
     err.value = (e as Error).message
@@ -161,11 +190,24 @@ onMounted(load)
         <n-form-item label="密码（至少 12 位）">
           <n-input v-model:value="createForm.password" type="password" show-password-on="click" />
         </n-form-item>
-        <n-form-item label="月额度（元）">
+        <n-form-item label="初始额度（元）">
           <n-input-number v-model:value="createForm.quotaYuan" :min="-1" />
           <span style="margin-left: 10px; font-size: 12px; color: #8b93a7">0 = 不能出卡，-1 = 不限</span>
         </n-form-item>
         <n-button type="primary" :loading="busy" block @click="create">创建</n-button>
+      </n-form>
+    </n-modal>
+
+    <n-modal :show="!!quotaTarget" preset="card" title="加 / 扣额度" style="width: min(420px, 94vw)"
+      @update:show="(v: boolean) => { if (!v) quotaTarget = null }">
+      <n-form label-placement="top">
+        <n-form-item label="金额（元，正数加、负数扣）">
+          <n-input-number v-model:value="quotaForm.amountYuan" />
+        </n-form-item>
+        <n-form-item label="备注（可选）">
+          <n-input v-model:value="quotaForm.note" placeholder="例如：微信转账 500" />
+        </n-form-item>
+        <n-button type="primary" :loading="busy" block @click="addQuota">确认</n-button>
       </n-form>
     </n-modal>
 

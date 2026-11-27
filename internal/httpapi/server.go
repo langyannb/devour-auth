@@ -157,6 +157,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("PUT /admin/api/agents/{id}/prices", s.requireAdmin(s.requireRole("admin", s.setAgentPrices)))
 	mux.HandleFunc("POST /admin/api/agents/{id}/unfreeze", s.requireAdmin(s.setAgentFrozen(false)))
 	mux.HandleFunc("GET /admin/api/agents/{id}/bills", s.requireAdmin(s.agentBillsAdmin))
+	mux.HandleFunc("POST /admin/api/agents/{id}/quota", s.requireAdmin(s.agentQuotaTopup))
 	mux.HandleFunc("POST /admin/api/bills/{billId}/settle", s.requireAdmin(s.settleBill))
 
 	// 代理端（独立会话域）

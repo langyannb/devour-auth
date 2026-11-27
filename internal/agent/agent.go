@@ -31,7 +31,7 @@ func New(st *store.Store) *Service {
 }
 
 var (
-	ErrQuota = errors.New("超出本月额度")
+	ErrQuota = errors.New("额度不足")
 )
 
 // ---------- 登录 ----------
@@ -133,20 +133,9 @@ func (s *Service) Issue(ctx context.Context, req IssueReq) (IssueResult, error) 
 	}
 	payable := unitPrice * int64(req.Qty)
 
-	// 额度：0 = 没有额度（不能出卡），-1 = 不限，>0 = 上限
-	if a.MonthlyQuotaCents >= 0 {
-		tx, err := s.st.DB().BeginTx(ctx, nil)
-		if err != nil {
-			return IssueResult{}, err
-		}
-		used, qerr := s.st.MonthlyIssuedCentsTx(ctx, tx, a.ID, monthStart(now))
-		tx.Rollback()
-		if qerr != nil {
-			return IssueResult{}, qerr
-		}
-		if used+payable > a.MonthlyQuotaCents {
-			return IssueResult{}, fmt.Errorf("%w: 本月已用 %d 分，额度 %d 分", ErrQuota, used, a.MonthlyQuotaCents)
-		}
+	// 额度：-1 = 不限，其余为可用余额，用完不能出卡
+	if a.QuotaCents >= 0 && a.QuotaCents < payable {
+		return IssueResult{}, fmt.Errorf("%w: 剩余额度 %d 分，本次需要 %d 分", ErrQuota, a.QuotaCents, payable)
 	}
 
 	var parent store.Agent
@@ -168,6 +157,18 @@ func (s *Service) Issue(ctx context.Context, req IssueReq) (IssueResult, error) 
 		IP:        req.IP,
 		Hook: func(ctx context.Context, tx *sql.Tx, batchID int64) error {
 			ref := fmt.Sprintf("batch:%d", batchID)
+			// 原子扣额度，防并发超扣；失败会让整批发卡回滚
+			if a.QuotaCents >= 0 {
+				res, err := tx.ExecContext(ctx,
+					`UPDATE agents SET quota_cents = quota_cents - ? WHERE id = ? AND quota_cents >= ?`,
+					payable, a.ID, payable)
+				if err != nil {
+					return err
+				}
+				if n, _ := res.RowsAffected(); n == 0 {
+					return fmt.Errorf("%w: 额度不足", ErrQuota)
+				}
+			}
 			if err := s.st.AddAgentLedgerTx(ctx, tx, a.ID, "issue", payable, ref, now.Unix()); err != nil {
 				return err
 			}

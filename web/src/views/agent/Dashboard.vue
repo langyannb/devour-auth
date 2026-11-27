@@ -8,7 +8,7 @@ interface Summary {
   name: string
   level: number
   discount_bp: number
-  monthly_quota_cents: number
+  quota_cents: number
   month_used_cents: number
   month_remaining: number
   cards: number
@@ -55,8 +55,8 @@ onMounted(load)
         <div class="v">{{ data ? formatYuan(data.month_used_cents) + ' 元' : '—' }}</div>
       </n-card>
       <n-card size="small" style="min-width: 160px">
-        <div class="k">本月剩余额度</div>
-        <div class="v">{{ quotaText(data?.month_remaining) }}</div>
+        <div class="k">可用额度</div>
+        <div class="v">{{ quotaText(data?.quota_cents) }}</div>
       </n-card>
       <n-card size="small" style="min-width: 130px">
         <div class="k">我的卡密</div>
@@ -75,7 +75,7 @@ onMounted(load)
     <n-card v-if="data" size="small" style="margin-bottom: 16px">
       <div class="line"><span>代理名</span><span>{{ data.name }}（L{{ data.level }}）</span></div>
       <div class="line"><span>折扣</span><span>{{ (data.discount_bp / 1000).toFixed(1) }} 折</span></div>
-      <div class="line"><span>月度额度</span><span>{{ quotaText(data.monthly_quota_cents) }}</span></div>
+      <div class="line"><span>额度</span><span>{{ quotaText(data.quota_cents) }}</span></div>
     </n-card>
 
     <n-card size="small" title="公告">

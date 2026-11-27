@@ -62,7 +62,8 @@ func (e *env) agent(t *testing.T, name string, parent, discountBP, rebateBP, quo
 	}
 	a := store.Agent{
 		Name: name, Level: 1, DiscountBP: discountBP, RebateBP: rebateBP,
-		MonthlyQuotaCents: quota, PassHash: hash, Status: "active", CreatedAt: e.now.Unix(),
+		MonthlyQuotaCents: quota, QuotaCents: quota,
+		PassHash: hash, Status: "active", CreatedAt: e.now.Unix(),
 	}
 	if parent > 0 {
 		a.ParentID = store.NullInt64(parent)

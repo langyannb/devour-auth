@@ -112,15 +112,9 @@ func (s *Service) IssueByPlan(ctx context.Context, req PlanIssueReq) (IssueResul
 	payable := unitPrice * int64(req.Qty)
 	now := s.now()
 
-	// 月额度：0 = 不能出卡，-1 = 不限
-	if a.MonthlyQuotaCents >= 0 {
-		used, err := s.st.MonthlyIssuedCents(ctx, a.ID, monthStart(now))
-		if err != nil {
-			return IssueResult{}, err
-		}
-		if used+payable > a.MonthlyQuotaCents {
-			return IssueResult{}, fmt.Errorf("%w: 本月已用 %d 分，额度 %d 分", ErrQuota, used, a.MonthlyQuotaCents)
-		}
+	// 额度：-1 = 不限，其余为可用余额
+	if a.QuotaCents >= 0 && a.QuotaCents < payable {
+		return IssueResult{}, fmt.Errorf("%w: 剩余额度 %d 分，本次需要 %d 分", ErrQuota, a.QuotaCents, payable)
 	}
 
 	// 模板卡类型对应的内部策略
@@ -156,6 +150,17 @@ func (s *Service) IssueByPlan(ctx context.Context, req PlanIssueReq) (IssueResul
 		Kamis:           req.Kamis,
 		Hook: func(ctx context.Context, tx *sql.Tx, batchID int64) error {
 			ref := fmt.Sprintf("batch:%d", batchID)
+			if a.QuotaCents >= 0 {
+				res, err := tx.ExecContext(ctx,
+					`UPDATE agents SET quota_cents = quota_cents - ? WHERE id = ? AND quota_cents >= ?`,
+					payable, a.ID, payable)
+				if err != nil {
+					return err
+				}
+				if n, _ := res.RowsAffected(); n == 0 {
+					return fmt.Errorf("%w: 额度不足", ErrQuota)
+				}
+			}
 			if err := s.st.AddAgentLedgerTx(ctx, tx, a.ID, "issue", payable, ref, now.Unix()); err != nil {
 				return err
 			}
