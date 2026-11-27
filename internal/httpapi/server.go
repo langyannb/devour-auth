@@ -127,6 +127,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /admin/api/cards", s.requireAdmin(s.listCards))
 	mux.HandleFunc("GET /admin/api/cards/export", s.requireAdmin(s.exportCards))
 	mux.HandleFunc("POST /admin/api/cards/batch", s.requireAdmin(s.batchCards))
+	mux.HandleFunc("GET /admin/api/cards/bulk-preview", s.requireAdmin(s.bulkPreview))
+	mux.HandleFunc("POST /admin/api/cards/bulk", s.requireAdmin(s.requireRole("admin", s.requireReauth(s.bulkCards))))
 	mux.HandleFunc("PATCH /admin/api/cards/{id}", s.requireAdmin(s.patchCard))
 	mux.HandleFunc("GET /admin/api/cards/{id}", s.requireAdmin(s.getCard))
 	mux.HandleFunc("POST /admin/api/cards/{id}/ban", s.requireAdmin(s.cardStatusAction("ban", s.cards.Ban)))

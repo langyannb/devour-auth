@@ -2,7 +2,7 @@
 import { computed, h, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import {
-  NAlert, NButton, NDataTable, NInput, NPagination, NSpace, NTag,
+  NAlert, NButton, NDataTable, NInput, NInputNumber, NModal, NPagination, NSelect, NSpace, NTag,
   type DataTableColumns,
 } from 'naive-ui'
 import { api } from '../api'
@@ -37,6 +37,17 @@ const err = ref('')
 const notice = ref('')
 const selected = ref<number[]>([])
 const busy = ref(false)
+
+// 按范围批量操作（不是勾选，是整批）
+const bulkScope = ref('active')
+const bulkValue = ref(1)
+const bulkUnit = ref<'day' | 'hour'>('day')
+const bulkBusy = ref(false)
+const confirmBox = ref({ show: false, action: 'add', text: '', seconds: 0 })
+
+const scopeLabels: Record<string, string> = {
+  active: '已激活', unused: '未使用', expired: '已过期', all: '全部',
+}
 
 const statusType = (s: string) => {
   switch (s) {
@@ -186,6 +197,56 @@ function exportCSV() {
   window.open(`/admin/api/cards/export?${q.toString()}`, '_blank')
 }
 
+function bulkSeconds(): number {
+  return bulkValue.value * (bulkUnit.value === 'day' ? 86400 : 3600)
+}
+
+async function previewBulk(action: string) {
+  err.value = ''
+  notice.value = ''
+  const scope = action === 'recycle' ? 'expired' : bulkScope.value
+  try {
+    const d = await api.get<{ total: number; time_cards: number }>(
+      `/admin/api/cards/bulk-preview?scope=${scope}`,
+    )
+    const n = action === 'recycle' ? d.total : d.time_cards
+    if (n === 0) {
+      notice.value = `「${scopeLabels[scope]}」没有可操作的卡`
+      return
+    }
+    const unit = bulkUnit.value === 'day' ? '天' : '小时'
+    const what = action === 'add'
+      ? `加时 ${bulkValue.value} ${unit}`
+      : action === 'subtract' ? `扣时 ${bulkValue.value} ${unit}` : '清理（置为已回收）'
+    confirmBox.value = {
+      show: true,
+      action,
+      seconds: action === 'recycle' ? 0 : bulkSeconds(),
+      text: `将对「${scopeLabels[scope]}」的 ${n} 张卡${what}，操作不可逐张撤销。`,
+    }
+  } catch (e) {
+    err.value = (e as Error).message
+  }
+}
+
+async function doBulk() {
+  bulkBusy.value = true
+  err.value = ''
+  notice.value = ''
+  const { action, seconds } = confirmBox.value
+  const scope = action === 'recycle' ? 'expired' : bulkScope.value
+  try {
+    const d = await api.post<{ affected: number }>('/admin/api/cards/bulk', { scope, action, seconds })
+    notice.value = `已处理 ${d.affected} 张（${scopeLabels[scope]}）`
+    confirmBox.value.show = false
+    await load()
+  } catch (e) {
+    err.value = (e as Error).message
+  } finally {
+    bulkBusy.value = false
+  }
+}
+
 onMounted(load)
 </script>
 
@@ -200,6 +261,26 @@ onMounted(load)
       <n-button type="primary" @click="search">查询</n-button>
       <n-button @click="exportCSV">导出 CSV</n-button>
     </n-space>
+
+    <div class="bulk-bar">
+      <span class="bulk-label">批量调时</span>
+      <n-select
+        v-model:value="bulkScope"
+        :options="Object.entries(scopeLabels).map(([value, label]) => ({ value, label }))"
+        size="small"
+        style="width: 110px"
+      />
+      <n-input-number v-model:value="bulkValue" :min="1" :precision="0" size="small" style="width: 100px" />
+      <n-select
+        v-model:value="bulkUnit"
+        :options="[{ label: '天', value: 'day' }, { label: '小时', value: 'hour' }]"
+        size="small"
+        style="width: 90px"
+      />
+      <n-button size="small" :loading="bulkBusy" @click="previewBulk('add')">全部加时</n-button>
+      <n-button size="small" :loading="bulkBusy" @click="previewBulk('subtract')">全部扣时</n-button>
+      <n-button size="small" type="error" ghost :loading="bulkBusy" @click="previewBulk('recycle')">清理已过期</n-button>
+    </div>
 
     <n-alert v-if="err" type="error" style="margin-bottom: 12px">{{ err }}</n-alert>
     <n-alert v-if="notice" type="success" style="margin-bottom: 12px">{{ notice }}</n-alert>
@@ -226,10 +307,33 @@ onMounted(load)
     <n-space justify="end" style="margin-top: 16px">
       <n-pagination v-model:page="page" :page-size="pageSize" :item-count="total" @update:page="load" />
     </n-space>
+
+    <n-modal v-model:show="confirmBox.show" preset="card" title="确认批量操作" style="width: 440px">
+      <p style="margin: 0 0 16px">{{ confirmBox.text }}</p>
+      <n-space justify="end">
+        <n-button @click="confirmBox.show = false">取消</n-button>
+        <n-button type="primary" :loading="bulkBusy" @click="doBulk">确认执行</n-button>
+      </n-space>
+    </n-modal>
   </div>
 </template>
 
 <style scoped>
+.bulk-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  background: #fff;
+  border: 1px solid #eee;
+  border-radius: 6px;
+}
+.bulk-label {
+  font-size: 13px;
+  color: #666;
+}
 .batch-bar {
   display: flex;
   align-items: center;
