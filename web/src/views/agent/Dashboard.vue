@@ -8,6 +8,7 @@ interface Summary {
   name: string
   level: number
   discount_bp: number
+  rebate_bp: number
   quota_cents: number
   month_used_cents: number
   month_remaining: number
@@ -74,7 +75,7 @@ onMounted(load)
 
     <n-card v-if="data" size="small" style="margin-bottom: 16px">
       <div class="line"><span>代理名</span><span>{{ data.name }}（L{{ data.level }}）</span></div>
-      <div class="line"><span>折扣</span><span>{{ (data.discount_bp / 1000).toFixed(1) }} 折</span></div>
+      <div class="line"><span>返点</span><span>{{ (data.rebate_bp / 100).toFixed(1) }}%</span></div>
       <div class="line"><span>额度</span><span>{{ quotaText(data.quota_cents) }}</span></div>
     </n-card>
 
