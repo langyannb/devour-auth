@@ -7,6 +7,8 @@ const host = location.hostname
 const forced = new URLSearchParams(location.search).get('role')
 const isUnbind = host.startsWith('unbind.')
 const isAgent = host.startsWith('agent.') || forced === 'agent'
+// ?role=public 本地看官网首页（默认 127.0.0.1 走管理端）
+const isPublic = forced === 'public'
 const isAdmin = host.startsWith('admin.') || forced === 'admin' ||
   host === 'localhost' || host === '127.0.0.1' || host === ''
 
@@ -17,28 +19,28 @@ const adminRoutes: RouteRecordRaw[] = [
     component: () => import('./views/Layout.vue'),
     children: [
       { path: '', redirect: '/dashboard' },
-      { path: 'dashboard', component: () => import('./views/Overview.vue') },
-      { path: 'cards', component: () => import('./views/Cards.vue') },
+      { path: 'dashboard', meta: { title: '概览' }, component: () => import('./views/Overview.vue') },
+      { path: 'cards', meta: { title: '卡密' }, component: () => import('./views/Cards.vue') },
       { path: 'cards/:id', component: () => import('./views/CardDetail.vue') },
-      { path: 'devices', component: () => import('./views/Devices.vue') },
-      { path: 'sessions', component: () => import('./views/Sessions.vue') },
-      { path: 'issue', component: () => import('./views/Issue.vue') },
-      { path: 'policies', component: () => import('./views/Policies.vue') },
-      { path: 'entitlements', component: () => import('./views/Entitlements.vue') },
-      { path: 'apps', component: () => import('./views/Apps.vue') },
-      { path: 'accounts', component: () => import('./views/Accounts.vue') },
-      { path: 'open', component: () => import('./views/OpenApi.vue') },
-      { path: 'webhooks', component: () => import('./views/Webhooks.vue') },
-      { path: 'blacklist', component: () => import('./views/Blacklist.vue') },
-      { path: 'events', component: () => import('./views/Events.vue') },
-      { path: 'finance', component: () => import('./views/Finance.vue') },
-      { path: 'agents', component: () => import('./views/Agents.vue') },
-      { path: 'plans', component: () => import('./views/Plans.vue') },
+      { path: 'devices', meta: { title: '设备' }, component: () => import('./views/Devices.vue') },
+      { path: 'sessions', meta: { title: '在线会话' }, component: () => import('./views/Sessions.vue') },
+      { path: 'issue', meta: { title: '发卡' }, component: () => import('./views/Issue.vue') },
+      { path: 'policies', meta: { title: '策略' }, component: () => import('./views/Policies.vue') },
+      { path: 'entitlements', meta: { title: '权限包' }, component: () => import('./views/Entitlements.vue') },
+      { path: 'apps', meta: { title: '应用' }, component: () => import('./views/Apps.vue') },
+      { path: 'accounts', meta: { title: '账号' }, component: () => import('./views/Accounts.vue') },
+      { path: 'open', meta: { title: '开放接口' }, component: () => import('./views/OpenApi.vue') },
+      { path: 'webhooks', meta: { title: '回调' }, component: () => import('./views/Webhooks.vue') },
+      { path: 'blacklist', meta: { title: '黑名单' }, component: () => import('./views/Blacklist.vue') },
+      { path: 'events', meta: { title: '日志' }, component: () => import('./views/Events.vue') },
+      { path: 'finance', meta: { title: '财务' }, component: () => import('./views/Finance.vue') },
+      { path: 'agents', meta: { title: '代理' }, component: () => import('./views/Agents.vue') },
+      { path: 'plans', meta: { title: '价格模板' }, component: () => import('./views/Plans.vue') },
       { path: 'agents/:id', component: () => import('./views/AgentDetail.vue') },
-      { path: 'ops', component: () => import('./views/Ops.vue') },
-      { path: 'audit', component: () => import('./views/Audit.vue') },
-      { path: 'settings', component: () => import('./views/Settings.vue') },
-      { path: 'security', component: () => import('./views/Security.vue') },
+      { path: 'ops', meta: { title: '运营' }, component: () => import('./views/Ops.vue') },
+      { path: 'audit', meta: { title: '审计' }, component: () => import('./views/Audit.vue') },
+      { path: 'settings', meta: { title: '设置' }, component: () => import('./views/Settings.vue') },
+      { path: 'security', meta: { title: '安全' }, component: () => import('./views/Security.vue') },
     ],
   },
 ]
@@ -53,12 +55,12 @@ const agentRoutes: RouteRecordRaw[] = [
     component: () => import('./views/agent/Layout.vue'),
     children: [
       { path: '', redirect: '/dashboard' },
-      { path: 'dashboard', component: () => import('./views/agent/Dashboard.vue') },
-      { path: 'cards', component: () => import('./views/agent/Cards.vue') },
-      { path: 'issue', component: () => import('./views/agent/Issue.vue') },
+      { path: 'dashboard', meta: { title: '概览' }, component: () => import('./views/agent/Dashboard.vue') },
+      { path: 'cards', meta: { title: '卡密' }, component: () => import('./views/agent/Cards.vue') },
+      { path: 'issue', meta: { title: '发卡' }, component: () => import('./views/agent/Issue.vue') },
       { path: 'subagents', component: () => import('./views/agent/Subagents.vue') },
       { path: 'billing', component: () => import('./views/agent/Billing.vue') },
-      { path: 'settings', component: () => import('./views/agent/Settings.vue') },
+      { path: 'settings', meta: { title: '设置' }, component: () => import('./views/agent/Settings.vue') },
     ],
   },
 ]
@@ -76,11 +78,12 @@ const unbindRoutes: RouteRecordRaw[] = [
 
 const router = createRouter({
   history: createWebHistory(),
-  routes: isUnbind ? unbindRoutes : isAgent ? agentRoutes : isAdmin ? adminRoutes : publicRoutes,
+  routes: isUnbind ? unbindRoutes : isPublic ? publicRoutes : isAgent ? agentRoutes : isAdmin ? adminRoutes : publicRoutes,
 })
 
 router.beforeEach(async (to) => {
   if (isUnbind) return true // 解绑页免登录
+  if (isPublic) return true // 官网首页免登录
   if (!isAgent && !isAdmin) return true // 官网与查卡页免登录
 
   if (isAgent) {
