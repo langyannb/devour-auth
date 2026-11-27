@@ -97,6 +97,8 @@ func (s *Server) setAccountIPAllow(w http.ResponseWriter, r *http.Request) {
 		internalErr(w, s.log, "保存 IP 白名单失败", err)
 		return
 	}
+	// 旧会话仍带着改之前的来源 IP，留着等于白名单没生效
+	_, _ = s.st.RevokeAllAdminSessions(ctx, id, s.now().Unix())
 	a, err := s.st.AdminAccountByID(ctx, id)
 	if err != nil {
 		internalErr(w, s.log, "查账号失败", err)

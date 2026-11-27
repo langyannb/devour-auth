@@ -68,20 +68,13 @@ func TestAdminAppScope(t *testing.T) {
 		t.Fatalf("别人的卡不该能封禁，得到 %d", code)
 	}
 
-	// 账号列表只看到自己应用里的账号（全局管理员不可见）
-	code, body = e.do(t, fc, http.MethodGet, "/admin/api/accounts", "", "9.1.2.2", "")
-	if code != http.StatusOK || !strings.Contains(body, "friend-dev") || strings.Contains(body, "zjyzjy") {
-		t.Fatalf("账号列表应只有本应用的账号: %d %s", code, body)
+	// 只有最高权限能管账号：绑定应用的账号一律 403
+	if code, _ := e.do(t, fc, http.MethodGet, "/admin/api/accounts", "", "9.1.2.2", ""); code != http.StatusForbidden {
+		t.Fatalf("绑定账号不该能看账号列表，得到 %d", code)
 	}
-	// 想把自己的账号建到别的应用，服务端强制改成自己的应用
-	if code, body := e.do(t, fc, http.MethodPost, "/admin/api/accounts", fcsrf, "9.1.2.2",
-		`{"username":"friend-op","password":"`+testPass+`","role":"operator","app_id":1}`); code != http.StatusOK {
-		t.Fatalf("建子账号失败: %d %s", code, body)
-	}
-	var opApp int64
-	_ = e.st.DB().QueryRow(`SELECT app_id FROM admins WHERE username='friend-op'`).Scan(&opApp)
-	if opApp != friendApp {
-		t.Fatalf("子账号应落在自己的应用，得到 %d", opApp)
+	if code, _ := e.do(t, fc, http.MethodPost, "/admin/api/accounts", fcsrf, "9.1.2.2",
+		`{"username":"friend-op","password":"`+testPass+`","role":"operator"}`); code != http.StatusForbidden {
+		t.Fatalf("绑定账号不该能建账号，得到 %d", code)
 	}
 	// 审计可以看（只含本应用的 actor），实例级体检仍然拒绝
 	if code, _ := e.do(t, fc, http.MethodGet, "/admin/api/audit", "", "9.1.2.2", ""); code != http.StatusOK {

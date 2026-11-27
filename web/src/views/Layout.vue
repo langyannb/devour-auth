@@ -82,7 +82,11 @@ const fullMenu = computed<MenuOption[]>(() => [
 const menu = computed<MenuOption[]>(() => {
   if (!scoped.value) return fullMenu.value
   return fullMenu.value
-    .map((g) => (g.type === 'group' ? { ...g, children: (g.children ?? []).filter((c) => c.key !== '/security') } : g))
+    .map((g) =>
+      g.type === 'group'
+        ? { ...g, children: (g.children ?? []).filter((c) => c.key !== '/security' && c.key !== '/accounts') }
+        : g,
+    )
     .filter((g) => g.type !== 'group' || (g.children ?? []).length > 0)
 })
 
