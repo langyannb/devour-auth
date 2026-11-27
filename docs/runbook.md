@@ -379,3 +379,24 @@ OpenChamber 的 Server Browser 扩展默认拦截本地与私有地址，页面�
 | 代理违规 | 冻结代理（不能出卡），保留账单 |
 | 密钥泄露 | 轮换对应密钥 + 吊销全部会话 |
 | 数据库损坏 | 停服务 → 用最近备份恢复 → 校验审计链 |
+
+## 解绑页（unbind.namikao.com）
+
+- DNS：`unbind.namikao.com` A 记录指向 `43.248.187.94`。
+- nginx：`deploy/nginx-devour-unbind.conf`（80 只放 ACME 与跳转，443 反代 `127.0.0.1:6760`）。
+- 应用：`DEVOUR_UNBIND_HOST`（默认 `unbind.namikao.com`），该 Host 只放行页面与 `/v1/query*`。
+- 证书：`/etc/letsencrypt/live/unbind.namikao.com/`。
+
+**证书签发注意**：服务器出站到 Let's Encrypt 的 443 会超时（acme-v02 被墙），
+`certbot` 在服务器上跑不通。当前证书是在能访问 LE 的机器上这样签的：
+
+```bash
+# 服务器：/.well-known/acme-challenge/ 用 root /var/www/certbot 提供
+# 本机：auth 钩子把 token scp 到服务器，再用 manual 模式签发
+certbot certonly --manual --preferred-challenges http \
+  --manual-auth-hook ./auth.sh --manual-cleanup-hook ./clean.sh \
+  -d unbind.namikao.com --agree-tos --register-unsafely-without-email -n
+# 然后把 fullchain.pem / privkey.pem 拷到服务器的 live/unbind.namikao.com/
+```
+
+续期（90 天）同样需要这样做；想省事就在 DNSPod 配 API token 走 DNS-01 自动续期。
