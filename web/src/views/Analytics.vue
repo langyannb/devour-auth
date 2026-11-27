@@ -144,9 +144,9 @@ onMounted(load)
         <span class="sub">在线 {{ data?.online_sessions ?? 0 }} · 设备 {{ data?.devices_bound ?? 0 }}</span>
       </div>
       <div class="stat">
-        <span class="k">{{ days }} 天出卡金额</span>
+        <span class="k">{{ days }} 天代理出卡金额</span>
         <span class="v">{{ periodMoney }}</span>
-        <span class="sub">共 {{ periodLogins }} 次登录</span>
+        <span class="sub">仅代理出的卡计入</span>
       </div>
       <div class="stat">
         <span class="k">{{ days }} 天激活</span>
@@ -190,7 +190,7 @@ onMounted(load)
       </n-card>
 
       <n-card size="small" class="span-6">
-        <template #header><span class="card-title">出卡金额（元）</span></template>
+        <template #header><span class="card-title">代理出卡金额（元）</span></template>
         <div v-if="!hasMoney" class="empty">这段时间还没有出卡。</div>
         <TrendChart v-else :labels="labels" :series="money" :height="180" />
       </n-card>

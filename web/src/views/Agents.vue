@@ -13,7 +13,6 @@ interface Agent {
   name: string
   parent_id: number | null
   level: number
-  discount_bp: number
   rebate_bp: number
   monthly_quota_cents: number
   quota_cents: number

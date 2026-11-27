@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, ref } from 'vue'
 import {
   NAlert, NButton, NCard, NForm, NFormItem, NInputNumber, NInput, NSelect, NSpace, NSwitch, NTag,
 } from 'naive-ui'
@@ -80,10 +80,6 @@ const customLines = computed(() =>
   customText.value.split('\n').map((s) => s.trim()).filter(Boolean),
 )
 
-async function loadPolicies() {
-  // 卡类型已合并进价格模板，这里不再预加载策略
-}
-
 async function generate() {
   err.value = ''
   notice.value = ''
@@ -142,7 +138,6 @@ async function copyAll() {
   notice.value = '已复制'
 }
 
-onMounted(loadPolicies)
 </script>
 
 <template>

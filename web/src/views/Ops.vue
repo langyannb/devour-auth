@@ -55,6 +55,7 @@ const policy = ref<Policy>({
   verify_ip: false,
 })
 const policyBase = ref<Record<string, string>>({})
+const policyLoaded = ref(false)
 
 function num(v: string | undefined): number {
   const n = Number.parseInt(v ?? '0', 10)
@@ -268,16 +269,20 @@ async function loadAll() {
     ])
     releases.value = r
     notices.value = n
-    policy.value = {
-      card_mode: f.card_mode === 'free' ? 'free' : 'paid',
-      unbind_free: num(f.unbind_free),
-      unbind_cooldown_days: num(f.unbind_cooldown_days),
-      unbind_mode: f.unbind_mode === 'charge' ? 'charge' : 'reject',
-      unbind_cost_hours: num(f.unbind_cost_hours),
-      verify_device: f.verify_device !== '0',
-      verify_ip: f.verify_ip === '1',
+    // 只在首次回填策略，之后刷新列表不能覆盖还没保存的改动
+    if (!policyLoaded.value) {
+      policy.value = {
+        card_mode: f.card_mode === 'free' ? 'free' : 'paid',
+        unbind_free: num(f.unbind_free),
+        unbind_cooldown_days: num(f.unbind_cooldown_days),
+        unbind_mode: f.unbind_mode === 'charge' ? 'charge' : 'reject',
+        unbind_cost_hours: num(f.unbind_cost_hours),
+        verify_device: f.verify_device !== '0',
+        verify_ip: f.verify_ip === '1',
+      }
+      policyBase.value = policyValues()
+      policyLoaded.value = true
     }
-    policyBase.value = policyValues()
     flagRows.value = Object.entries(f).map(([key, value]) => ({ key, value }))
   } catch (e) {
     err.value = (e as Error).message

@@ -54,7 +54,7 @@ async function submit() {
             autocomplete="current-password"
           />
         </n-form-item>
-        <n-form-item label="动态验证码">
+        <n-form-item label="动态验证码（未绑定可留空）">
           <n-input v-model:value="totp" placeholder="6 位数字" maxlength="6" />
         </n-form-item>
         <n-button type="primary" block :loading="busy" @click="submit">{{ busy ? '登录中…' : '登录' }}</n-button>

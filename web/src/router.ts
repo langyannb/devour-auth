@@ -4,7 +4,9 @@ import { agentAuthed, authed, tryRestore, tryRestoreAgent } from './api'
 // 子域决定端：admin.* → 管理端，agent.* → 代理端，unbind.* → 终端自解绑页，
 // 其余 → 官网/查卡。本地开发用 ?role=agent 切到代理端。
 const host = location.hostname
-const forced = new URLSearchParams(location.search).get('role')
+const isLocalHost = host === 'localhost' || host === '127.0.0.1' || host === ''
+// ?role= 只在本地生效，线上域名不接受外部强制切入口
+const forced = isLocalHost ? new URLSearchParams(location.search).get('role') : null
 const isUnbind = host.startsWith('unbind.') || forced === 'unbind'
 const isAgent = host.startsWith('agent.') || forced === 'agent'
 // ?role=public 本地看官网首页（默认 127.0.0.1 走管理端）
