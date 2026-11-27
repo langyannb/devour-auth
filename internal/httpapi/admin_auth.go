@@ -45,9 +45,10 @@ func adminFrom(r *http.Request) adminCtx {
 }
 
 type loginReq struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-	TOTP     string `json:"totp"`
+	Username     string `json:"username"`
+	Password     string `json:"password"`
+	TOTP         string `json:"totp"`
+	RecoveryCode string `json:"recovery_code"`
 }
 
 func (s *Server) adminLogin(w http.ResponseWriter, r *http.Request) {
@@ -87,10 +88,19 @@ func (s *Server) adminLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if a.TotpSecret != "" {
-		secret, err := auth.DecodeTOTPSecret(a.TotpSecret)
-		if err != nil || !auth.ValidateTOTP(secret, req.TOTP, now) {
-			writeErr(w, http.StatusUnauthorized, CodeUnauthorized, "动态验证码错误")
-			return
+		// 恢复码可以代替动态码，用一次作废
+		if req.RecoveryCode != "" {
+			used, err := s.st.UseRecoveryCode(ctx, a.ID, auth.HashToken(req.RecoveryCode), now.Unix())
+			if err != nil || !used {
+				writeErr(w, http.StatusUnauthorized, CodeUnauthorized, "恢复码无效或已使用")
+				return
+			}
+		} else {
+			secret, err := auth.DecodeTOTPSecret(a.TotpSecret)
+			if err != nil || !auth.ValidateTOTP(secret, req.TOTP, now) {
+				writeErr(w, http.StatusUnauthorized, CodeUnauthorized, "动态验证码错误")
+				return
+			}
 		}
 	}
 

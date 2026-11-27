@@ -31,6 +31,7 @@ const menu = computed<MenuOption[]>(() => [
   { label: '日志', key: '/events' },
   { label: '审计', key: '/audit' },
   { label: '安全', key: '/security' },
+  { label: '账号', key: '/accounts' },
   { label: '应用', key: '/apps' },
   { label: '设置', key: '/settings' },
 ])
