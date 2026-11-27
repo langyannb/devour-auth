@@ -114,6 +114,7 @@ func (s *Server) Handler() http.Handler {
 	// 应用、卡类型、权限（改价/改策略需 reauth）
 	mux.HandleFunc("GET /admin/api/apps", s.requireAdmin(s.listApps))
 	mux.HandleFunc("POST /admin/api/apps", s.requireAdmin(s.requireGlobal(s.requireRole("admin", s.createApp))))
+	mux.HandleFunc("POST /admin/api/tenants", s.requireAdmin(s.requireGlobal(s.requireRole("admin", s.createTenant))))
 	mux.HandleFunc("PATCH /admin/api/apps/{id}", s.requireAdmin(s.requireRole("admin", s.updateApp)))
 	mux.HandleFunc("POST /admin/api/policies", s.requireAdmin(s.requireRole("admin", s.requireReauth(s.createPolicy))))
 	mux.HandleFunc("PATCH /admin/api/policies/{id}", s.requireAdmin(s.requireRole("admin", s.requireReauth(s.updatePolicy))))

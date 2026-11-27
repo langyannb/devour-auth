@@ -4,10 +4,8 @@ import (
 	"bytes"
 	"context"
 	"crypto/hmac"
-	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
-	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -360,34 +358,18 @@ func (s *Server) createAPIKey(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	keyRaw := make([]byte, 12)
-	secretRaw := make([]byte, 32)
-	if _, err := rand.Read(keyRaw); err != nil {
-		internalErr(w, s.log, "生成密钥失败", err)
-		return
-	}
-	if _, err := rand.Read(secretRaw); err != nil {
-		internalErr(w, s.log, "生成密钥失败", err)
-		return
-	}
-	keyID := "ak_" + hex.EncodeToString(keyRaw)
-	secret := base64.RawURLEncoding.EncodeToString(secretRaw)
-
-	id, err := s.st.CreateAPIKey(ctx, store.APIKey{
-		AppID: app.ID, Name: req.Name, Scopes: req.Scopes, KeyID: keyID, Secret: secret,
-		Status: "active", CreatedAt: s.now().Unix(),
-	})
+	keyID, secret, err := s.newAPIKey(ctx, app.ID, req.Name, req.Scopes)
 	if err != nil {
 		internalErr(w, s.log, "创建密钥失败", err)
 		return
 	}
 	c := adminFrom(r)
-	_ = s.writeAudit(ctx, c, "openkey.create", fmt.Sprintf("openkey:%d", id), "",
+	_ = s.writeAudit(ctx, c, "openkey.create", fmt.Sprintf("openkey:%s", keyID), "",
 		fmt.Sprintf(`{"name":%q,"scopes":%q}`, req.Name, req.Scopes), clientIP(r))
 
 	// secret 只在这里返回一次
 	writeData(w, map[string]any{
-		"id": id, "name": req.Name, "scopes": req.Scopes,
+		"name": req.Name, "scopes": req.Scopes,
 		"key_id": keyID, "secret": secret,
 		"hint": "secret 只显示这一次，请立即保存",
 	})
