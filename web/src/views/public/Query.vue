@@ -155,7 +155,7 @@ async function unbind() {
         <div v-if="result.bound_devices > 0" style="margin-top: 16px">
           <n-button size="small" :loading="unbinding" @click="unbind">解绑全部设备</n-button>
           <span style="margin-left: 10px; font-size: 12px; color: #8b93a7">
-            受卡类型的免费换绑次数限制
+            受卡类型的换绑规则限制（免费次数或扣减时长）
           </span>
         </div>
       </n-card>
