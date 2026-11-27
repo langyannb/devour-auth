@@ -43,7 +43,8 @@ type LoginResult struct {
 	Agent     store.Agent
 }
 
-func (s *Service) Login(ctx context.Context, name, password, totp, ip, ua string) (LoginResult, error) {
+// Login 代理登录只用密码：动态验证码只对管理端强制（design.md 16.1）。
+func (s *Service) Login(ctx context.Context, name, password, ip, ua string) (LoginResult, error) {
 	now := s.now()
 	a, err := s.st.AgentByName(ctx, name)
 	if errors.Is(err, store.ErrNotFound) {
@@ -56,12 +57,6 @@ func (s *Service) Login(ctx context.Context, name, password, totp, ip, ua string
 	}
 	if a.Status != "active" {
 		return LoginResult{}, apierr.New(apierr.Unauthorized, "账号已冻结")
-	}
-	if a.TotpSecret != "" {
-		key, err := auth.DecodeTOTPSecret(a.TotpSecret)
-		if err != nil || !auth.ValidateTOTP(key, totp, now) {
-			return LoginResult{}, apierr.New(apierr.Unauthorized, "动态验证码错误")
-		}
 	}
 
 	token, err := auth.NewToken()

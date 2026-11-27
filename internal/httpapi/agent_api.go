@@ -111,7 +111,6 @@ func (s *Server) clearAgentCookie(w http.ResponseWriter) {
 type agentLoginReq struct {
 	Name     string `json:"name"`
 	Password string `json:"password"`
-	TOTP     string `json:"totp"`
 }
 
 func (s *Server) agentLogin(w http.ResponseWriter, r *http.Request) {
@@ -128,7 +127,7 @@ func (s *Server) agentLogin(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusTooManyRequests, CodeRateLimited, "尝试过于频繁")
 		return
 	}
-	res, err := s.agents.Login(r.Context(), req.Name, req.Password, req.TOTP, ip, truncate(r.UserAgent(), 200))
+	res, err := s.agents.Login(r.Context(), req.Name, req.Password, ip, truncate(r.UserAgent(), 200))
 	if err != nil {
 		s.writeAPIError(w, err)
 		return
@@ -321,7 +320,7 @@ func agentJSON(a store.Agent) map[string]any {
 		"id": a.ID, "name": a.Name, "parent_id": parent, "level": a.Level,
 		"discount_bp": a.DiscountBP, "rebate_bp": a.RebateBP,
 		"monthly_quota_cents": a.MonthlyQuotaCents, "status": a.Status,
-		"totp_enabled": a.TotpSecret != "", "created_at": a.CreatedAt, "frozen_at": frozen,
+		"created_at": a.CreatedAt, "frozen_at": frozen,
 	}
 }
 

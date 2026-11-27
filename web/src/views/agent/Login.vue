@@ -7,7 +7,6 @@ import { agentApi, agentAuthed, setCSRF } from '../../api'
 const router = useRouter()
 const name = ref('')
 const password = ref('')
-const totp = ref('')
 const err = ref('')
 const busy = ref(false)
 
@@ -25,7 +24,6 @@ async function submit() {
     const d = await agentApi.post<LoginData>('/agent/api/login', {
       name: name.value,
       password: password.value,
-      totp: totp.value,
     })
     setCSRF(d.csrf_token, 'agent')
     sessionStorage.setItem('devour_agent_name', `${d.name} · L${d.level}`)
@@ -49,9 +47,6 @@ async function submit() {
         </n-form-item>
         <n-form-item label="密码">
           <n-input v-model:value="password" type="password" show-password-on="click" />
-        </n-form-item>
-        <n-form-item label="动态验证码">
-          <n-input v-model:value="totp" placeholder="未启用可留空" maxlength="6" />
         </n-form-item>
         <n-button type="primary" block :loading="busy" @click="submit">登录</n-button>
       </n-form>
