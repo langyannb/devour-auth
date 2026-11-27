@@ -5,6 +5,7 @@ const host = location.hostname
 const isLocal = host === 'localhost' || host === '127.0.0.1' || host === ''
 const adminURL = isLocal ? '/login?role=admin' : 'https://admin.namikao.com/login'
 const agentURL = isLocal ? '/login?role=agent' : 'https://agent.namikao.com/login'
+const unbindURL = isLocal ? '/?role=unbind' : 'https://unbind.namikao.com/'
 
 const features = [
   {
@@ -29,8 +30,8 @@ const features = [
   },
   {
     icon: 'users',
-    title: '代理分销',
-    body: '两级代理、折扣基点、月度额度、上级返点与账单，出卡与记账在同一事务里完成。',
+    title: '两级代理',
+    body: '上级给下级设价格模板、划额度、开权限，下级也能自己定价；出卡与记账在同一事务里完成。',
   },
   {
     icon: 'code',
@@ -43,6 +44,33 @@ const steps = [
   { n: '01', t: '出卡', d: '后台或代理端批量生成，卡密不连续、不带业务信息。' },
   { n: '02', t: '客户端登录', d: '卡密 + 设备指纹换 access / refresh，令牌库内只存哈希。' },
   { n: '03', t: '持续校验', d: '心跳与消耗按策略扣减，暂停、吊销、封禁即时生效。' },
+]
+
+const ports = [
+  {
+    tag: 'admin.namikao.com',
+    title: '管理端',
+    body: '卡密、发卡、设备与在线、代理与价格模板、数据看板、审计链与安全体检。',
+    href: adminURL,
+  },
+  {
+    tag: 'agent.namikao.com',
+    title: '代理端',
+    body: '出卡、额度与流水、下级开通与定价、自己的数据看板。',
+    href: agentURL,
+  },
+  {
+    tag: 'net.namikao.com/query',
+    title: '卡密查询',
+    body: '输入卡密看状态、到期、剩余与绑定设备，也能一键解绑全部设备。',
+    href: '/query',
+  },
+  {
+    tag: 'unbind.namikao.com',
+    title: '设备解绑',
+    body: '按卡类型的换绑规则处理：免费次数、冷却天数、超额扣时，一次勾选清楚。',
+    href: unbindURL,
+  },
 ]
 
 const facts = [
@@ -113,6 +141,7 @@ onUnmounted(() => {
       </a>
       <nav class="links">
         <a href="#features">能力</a>
+        <a href="#ports">入口</a>
         <a href="#flow">接入</a>
         <a href="/query">查卡密</a>
         <a :href="adminURL" class="btn sm">进入后台</a>
@@ -184,7 +213,28 @@ onUnmounted(() => {
       </div>
     </section>
 
-    <section id="flow" class="section alt">
+    <section id="ports" class="section alt">
+      <div class="sec-head reveal">
+        <h2>四个入口，各管一段</h2>
+        <p class="sub">同一个二进制、同一套数据，管理端和代理端会话互不相通。</p>
+      </div>
+      <div class="ports">
+        <a
+          v-for="(p, i) in ports"
+          :key="p.title"
+          class="port reveal"
+          :style="{ transitionDelay: i * 60 + 'ms' }"
+          :href="p.href"
+        >
+          <span class="port-tag">{{ p.tag }}</span>
+          <h3>{{ p.title }}</h3>
+          <p>{{ p.body }}</p>
+          <span class="port-go">打开 →</span>
+        </a>
+      </div>
+    </section>
+
+    <section id="flow" class="section">
       <div class="sec-head reveal">
         <h2>接入只有三步</h2>
         <p class="sub">从出卡到吊销，客户端拿到的始终只是一张有时限的令牌。</p>
@@ -568,6 +618,37 @@ onUnmounted(() => {
 }
 .card h3 { margin: 0 0 8px; font-size: 16px; }
 .card p { margin: 0; font-size: 14px; line-height: 1.75; color: #5b6478; }
+
+.ports { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+.port {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 20px;
+  border-radius: 14px;
+  background: #f9fbfa;
+  border: 1px solid #e8eeeb;
+  text-decoration: none;
+  color: inherit;
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.25s ease;
+}
+.port:hover {
+  transform: translateY(-3px);
+  border-color: #bfe3cf;
+  box-shadow: 0 20px 36px -30px rgba(16, 24, 40, 0.5);
+}
+.port-tag {
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  color: #148c4f;
+  background: #eafaf1;
+  border-radius: 6px;
+  padding: 3px 7px;
+  align-self: flex-start;
+}
+.port h3 { margin: 4px 0 0; font-size: 17px; }
+.port p { margin: 0; font-size: 13.5px; line-height: 1.7; color: #5b6478; flex: 1; }
+.port-go { font-size: 12px; color: #148c4f; }
 
 .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; }
 .step {

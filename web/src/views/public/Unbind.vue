@@ -195,9 +195,11 @@ async function unbind() {
 <template>
   <div class="wrap">
     <header class="head">
-      <a class="brand" href="/">Devour<span>Auth</span></a>
-      <span class="hint">设备解绑</span>
-    </header>
+    <a class="brand" href="/"><span class="mark">D</span>Devour<b>Auth</b></a>
+    <span class="sep"></span>
+    <span class="hint">设备解绑</span>
+    <a class="back" href="/">返回首页</a>
+  </header>
 
     <main class="main">
       <h1>解绑已登录设备</h1>
@@ -311,141 +313,103 @@ async function unbind() {
 <style scoped>
 .wrap {
   min-height: 100vh;
-  background: #f7f8fb;
+  background: radial-gradient(120% 80% at 50% 0%, #eef8f2 0%, #f6f8f7 60%, #f6f8f7 100%);
 }
 .head {
+  position: sticky;
+  top: 0;
+  z-index: 10;
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 16px 24px;
-  border-bottom: 1px solid rgba(18, 21, 28, 0.06);
-  background: #fff;
+  padding: 12px 24px;
+  background: rgba(255, 255, 255, 0.86);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid #e8eeeb;
 }
 .brand {
-  font-weight: 800;
-  font-size: 17px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: -0.01em;
   text-decoration: none;
   color: #12151c;
 }
-.brand span {
-  color: #4f46e5;
-}
-.hint {
+.brand b { color: #18a058; font-weight: 700; }
+.brand .mark {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
   font-size: 13px;
-  color: #6b7280;
+  font-weight: 800;
+  color: #04140c;
+  background: linear-gradient(135deg, #4ade9b, #18a058);
 }
+.sep { width: 1px; height: 14px; background: #dfe7e3; }
+.hint { font-size: 13px; color: #6b7280; }
+.back { margin-left: auto; font-size: 13px; color: #4a5568; text-decoration: none; }
+.back:hover { color: #12151c; }
 .main {
-  max-width: 520px;
-  margin: 0 auto;
-  padding: 56px 20px 80px;
+  max-width: 560px;
+  margin: 28px auto 80px;
+  padding: 28px 26px 30px;
+  background: #fff;
+  border: 1px solid #e8eeeb;
+  border-radius: 16px;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 24px 48px -40px rgba(16, 24, 40, 0.5);
 }
-h1 {
-  margin: 0 0 10px;
-  font-size: 26px;
-  letter-spacing: -0.02em;
-}
-.lede {
-  margin: 0 0 24px;
-  color: #5b6478;
-  font-size: 14px;
-  line-height: 1.7;
-}
-.form {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-.form > :first-child {
-  flex: 1;
-  min-width: 220px;
-}
-.captcha {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 10px;
-}
-.captcha > :first-child {
-  flex: 1;
-  min-width: 120px;
-}
+h1 { margin: 0 0 8px; font-size: 22px; letter-spacing: -0.02em; }
+.lede { margin: 0 0 22px; color: #5b6478; font-size: 13.5px; line-height: 1.7; }
+.form { display: flex; gap: 10px; flex-wrap: wrap; }
+.form > :first-child { flex: 1; min-width: 200px; }
+.captcha { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+.captcha > :first-child { flex: 1; min-width: 120px; }
 .captcha-img {
   height: 50px;
   width: 160px;
   object-fit: cover;
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
-  border: 1px solid rgba(18, 21, 28, 0.1);
+  border: 1px solid #e8eeeb;
   background: #fff;
 }
 .row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 0;
-  border-bottom: 1px solid rgba(18, 21, 28, 0.05);
+  gap: 12px;
+  padding: 11px 0;
+  border-bottom: 1px solid #f1f4f3;
   font-size: 14px;
 }
-.row:last-child {
-  border-bottom: none;
-}
-.label {
-  color: #6b7280;
-}
-.warn {
-  color: #d97706;
-}
-.devices {
-  margin-top: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
+.row:last-child { border-bottom: none; }
+.label { color: #8b93a7; font-size: 13px; }
+.warn { color: #d97706; }
+.devices { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
 .device {
   display: flex;
   gap: 10px;
   align-items: flex-start;
   padding: 10px 12px;
-  border: 1px solid rgba(18, 21, 28, 0.08);
-  border-radius: 8px;
-  background: #fff;
+  border: 1px solid #e8eeeb;
+  border-radius: 10px;
+  background: #fbfcfc;
   cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
 }
-.device-body {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-.device-name {
-  font-size: 14px;
-  font-weight: 600;
-  color: #12151c;
-}
-.device-meta {
-  font-size: 12px;
-  color: #8b93a7;
-  word-break: break-all;
-}
-.actions {
-  margin-top: 16px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-.note {
-  font-size: 12px;
-  color: #8b93a7;
-}
-.foot {
-  margin-top: 28px;
-  font-size: 13px;
-  color: #8b93a7;
-}
+.device:hover { border-color: #bfe3cf; background: #f3fbf7; }
+.device-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.device-name { font-size: 14px; font-weight: 600; color: #12151c; }
+.device-meta { font-size: 12px; color: #8b93a7; word-break: break-all; }
+.actions { margin-top: 16px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.note { font-size: 12px; color: #8b93a7; }
+.foot { margin: 24px 0 0; font-size: 13px; color: #8b93a7; }
 @media (max-width: 640px) {
-  .main {
-    padding: 32px 16px 60px;
-  }
+  .main { margin: 16px 12px 48px; padding: 22px 18px 24px; }
+  .head { padding: 10px 14px; }
 }
 </style>
