@@ -25,6 +25,7 @@ type Options struct {
 	BackupDir  string
 	DBPath     string
 	ListenAddr string
+	Notifier   card.Notifier
 }
 
 type Server struct {
@@ -48,9 +49,13 @@ type Server struct {
 }
 
 func New(st *store.Store, log *slog.Logger, opt Options) *Server {
+	cardSvc := card.New(st)
+	if opt.Notifier != nil {
+		cardSvc.SetNotifier(opt.Notifier)
+	}
 	return &Server{
 		st:         st,
-		cards:      card.New(st),
+		cards:      cardSvc,
 		clients:    clientauth.New(st),
 		agents:     agent.New(st),
 		static:     opt.Static,
@@ -184,6 +189,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /admin/api/open/keys", s.requireAdmin(s.listAPIKeys))
 	mux.HandleFunc("POST /admin/api/open/keys", s.requireAdmin(s.createAPIKey))
 	mux.HandleFunc("POST /admin/api/open/debug", s.requireAdmin(s.openDebug))
+	mux.HandleFunc("GET /admin/api/webhooks", s.requireAdmin(s.listWebhooks))
+	mux.HandleFunc("POST /admin/api/webhooks", s.requireAdmin(s.createWebhook))
+	mux.HandleFunc("POST /admin/api/webhooks/{id}/toggle", s.requireAdmin(s.toggleWebhook))
+	mux.HandleFunc("DELETE /admin/api/webhooks/{id}", s.requireAdmin(s.deleteWebhook))
 	mux.HandleFunc("POST /admin/api/open/keys/{id}/disable", s.requireAdmin(s.setAPIKeyStatus(false)))
 	mux.HandleFunc("POST /admin/api/open/keys/{id}/enable", s.requireAdmin(s.setAPIKeyStatus(true)))
 

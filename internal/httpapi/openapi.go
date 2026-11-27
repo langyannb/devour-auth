@@ -100,6 +100,14 @@ func (s *Server) requireAPIKey(scope string, next http.HandlerFunc) http.Handler
 		}
 
 		_ = s.st.TouchAPIKey(r.Context(), k.ID, now)
+		// 调用日志（进 events，可在「日志」页按 kind=api 查看）
+		if tx, err := s.st.DB().BeginTx(r.Context(), nil); err == nil {
+			_ = s.st.InsertEventTx(r.Context(), tx, store.Event{
+				TS: now, Kind: "api", IP: clientIP(r),
+				Code: r.URL.Path, Detail: "key:" + k.KeyID,
+			})
+			_ = tx.Commit()
+		}
 		ctx := context.WithValue(r.Context(), openKeyCtxKey{}, k)
 		next(w, r.WithContext(ctx))
 	}

@@ -27,6 +27,7 @@ const menu = computed<MenuOption[]>(() => [
   { label: '财务', key: '/finance' },
   { label: '运营', key: '/ops' },
   { label: '对接', key: '/open' },
+  { label: '回调', key: '/webhooks' },
   { label: '日志', key: '/events' },
   { label: '审计', key: '/audit' },
   { label: '安全', key: '/security' },

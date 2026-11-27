@@ -118,13 +118,27 @@ func initialBalance(p store.Policy) (expireAt, remainTimes, points, remainingSec
 	}
 }
 
+// Notifier 卡密事件回调（webhook）。
+type Notifier interface {
+	Dispatch(ctx context.Context, appID int64, event string, payload map[string]any)
+}
+
 type Service struct {
-	st  *store.Store
-	now func() time.Time
+	st       *store.Store
+	now      func() time.Time
+	notifier Notifier
 }
 
 func New(st *store.Store) *Service {
 	return &Service{st: st, now: time.Now}
+}
+
+func (s *Service) SetNotifier(n Notifier) { s.notifier = n }
+
+func (s *Service) notify(ctx context.Context, appID int64, event string, payload map[string]any) {
+	if s.notifier != nil {
+		s.notifier.Dispatch(ctx, appID, event, payload)
+	}
 }
 
 type GenerateReq struct {

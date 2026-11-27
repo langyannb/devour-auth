@@ -88,6 +88,21 @@ async function generate() {
   }
 }
 
+function onFile(e: Event) {
+  const f = (e.target as HTMLInputElement).files?.[0]
+  if (!f) return
+  const reader = new FileReader()
+  reader.onload = () => {
+    const text = String(reader.result ?? '')
+    const lines = text
+      .split(/\r?\n/)
+      .map((l) => l.split(',')[0].trim())
+      .filter((l) => l && !/^kami$/i.test(l))
+    customText.value = lines.join('\n')
+  }
+  reader.readAsText(f)
+}
+
 async function copyAll() {
   await navigator.clipboard.writeText(kamis.value.join('\n'))
 }
@@ -121,8 +136,24 @@ onMounted(loadPolicies)
         </n-form-item>
         <n-form-item label="将生成">
           <n-tag size="small">{{ customLines.length }} 张</n-tag>
+          <label class="csv-btn">
+            选择 CSV 文件
+            <input type="file" accept=".csv,text/csv,text/plain" @change="onFile" />
+          </label>
         </n-form-item>
       </template>
+
+<style scoped>
+.csv-btn {
+  margin-left: 12px;
+  font-size: 13px;
+  color: #4f46e5;
+  cursor: pointer;
+}
+.csv-btn input {
+  display: none;
+}
+</style>
 
       <template v-else>
         <n-form-item label="数量">

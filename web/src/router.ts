@@ -26,6 +26,7 @@ const adminRoutes: RouteRecordRaw[] = [
       { path: 'entitlements', component: () => import('./views/Entitlements.vue') },
       { path: 'apps', component: () => import('./views/Apps.vue') },
       { path: 'open', component: () => import('./views/OpenApi.vue') },
+      { path: 'webhooks', component: () => import('./views/Webhooks.vue') },
       { path: 'blacklist', component: () => import('./views/Blacklist.vue') },
       { path: 'events', component: () => import('./views/Events.vue') },
       { path: 'finance', component: () => import('./views/Finance.vue') },

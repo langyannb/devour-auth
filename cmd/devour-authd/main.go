@@ -16,6 +16,7 @@ import (
 	"github.com/langyannb/devour-auth/internal/config"
 	"github.com/langyannb/devour-auth/internal/httpapi"
 	"github.com/langyannb/devour-auth/internal/store"
+	"github.com/langyannb/devour-auth/internal/webhook"
 	"github.com/langyannb/devour-auth/internal/webui"
 )
 
@@ -111,6 +112,7 @@ func run() error {
 			BackupDir:  cfg.BackupDir,
 			DBPath:     cfg.DBPath,
 			ListenAddr: cfg.ListenAddr,
+			Notifier:   webhook.New(st, log),
 		}).Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
 		IdleTimeout:       60 * time.Second,
