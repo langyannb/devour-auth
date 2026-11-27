@@ -281,11 +281,29 @@ make test       # go test ./... + 前端 vue-tsc
 
 本地全部走 HTTP，不需要域名或证书。重置环境：`rm -rf data/`。
 
-管理员：
+管理员（随机密码 + TOTP 秘钥只打印一次）：
 
 ```bash
-./bin/authd admin create --username admin
+make dev-init          # 等价于 go run ./cmd/devour-authd init-admin
 ```
+
+`make dev-init` 后按输出把 TOTP 秘钥导入验证器（或手动算码），登录时填 6 位动态码。
+
+### 用 Server Browser 看前端
+
+OpenChamber 的 Server Browser 扩展默认拦截本地与私有地址，页面会显示 `Blocked: http://127.0.0.1:5173`。
+在扩展目录的 `config.json` 里放行：
+
+```bash
+# ~/.config/openchamber/extensions/server-browser/config.json
+{
+  "chromePath": "/usr/local/bin/chrome-no-sandbox",
+  "allowedOrigins": ["http://127.0.0.1:5173", "http://127.0.0.1:6760"]
+}
+```
+
+改完重启扩展：`pkill -f 'server-browser/service/main.js'`，OpenChamber 会自动拉起。
+缺 Chrome 时按 README 把 `chromePath` 指到本机 `chrome` 二进制。
 
 ## 10. 监控
 

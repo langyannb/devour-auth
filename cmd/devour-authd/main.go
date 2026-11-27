@@ -34,8 +34,10 @@ func main() {
 		err = runVerifyAudit(config.Load())
 	case "anchor":
 		err = runAnchor(config.Load())
+	case "seed":
+		err = runSeed(config.Load())
 	default:
-		fmt.Fprintf(os.Stderr, "用法: %s [serve|init-admin|verify-audit|anchor]\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "用法: %s [serve|init-admin|verify-audit|anchor|seed]\n", os.Args[0])
 		os.Exit(2)
 	}
 

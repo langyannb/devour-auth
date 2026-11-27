@@ -13,6 +13,14 @@ web:
 web-build:
 	cd web && npm run build
 
+# 本地测试数据：权限、六种卡类型、每种两张卡（可重复执行）
+seed:
+	go run ./cmd/devour-authd seed
+
+# 建首个管理员（随机密码 + TOTP 秘钥只打印一次）
+dev-init:
+	go run ./cmd/devour-authd init-admin
+
 test:
 	go test ./...
 
