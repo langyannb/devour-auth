@@ -37,7 +37,7 @@ check: web-assets
 	@test -z "$$(gofmt -l .)" || { echo "以下文件未格式化："; gofmt -l .; exit 1; }
 	go vet ./...
 	go test ./...
-	cd web && npx vue-tsc --noEmit
+	cd web && npx vue-tsc --noEmit && npx vitest run
 
 build: web-build
 	CGO_ENABLED=0 go build -trimpath -ldflags '-s -w' -o $(BIN) ./cmd/devour-authd
