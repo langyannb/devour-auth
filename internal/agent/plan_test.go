@@ -69,3 +69,33 @@ func TestIssueByPlanMultiplierPriced(t *testing.T) {
 		t.Fatalf("永久卡应付 = %d want 9900", res2.Payable)
 	}
 }
+
+// 自定义时间按所选数值计费，否则填 100 天也按 1 份收钱。
+func TestIssueByPlanCustomPriced(t *testing.T) {
+	ctx := context.Background()
+	e := setup(t)
+	a := e.agent(t, "agcustom", 0, 10000, 0, -1)
+
+	planID, err := e.st.SaveAgentPlan(ctx, store.AgentPlan{
+		AppID: e.appID, Name: "p2", Active: 1,
+		Items: map[string]int64{"custom": 100},
+	}, e.now.Unix())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := e.st.SetAgentPlanAndPerms(ctx, a.ID, planID, store.AgentPermissions{MaxQty: 10}); err != nil {
+		t.Fatal(err)
+	}
+
+	res, err := e.svc.IssueByPlan(ctx, PlanIssueReq{
+		AgentID: a.ID, AppID: e.appID, Kind: "custom", Value: 3, Unit: "day",
+		Multiplier: 2, Qty: 1, DeviceLimit: 1,
+	})
+	if err != nil {
+		t.Fatalf("出卡: %v", err)
+	}
+	// 100 分/天 × 3 天 × 2 份 × 1 张 = 600 分
+	if res.Payable != 600 {
+		t.Fatalf("应付 = %d want 600", res.Payable)
+	}
+}

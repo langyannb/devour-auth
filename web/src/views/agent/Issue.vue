@@ -40,8 +40,9 @@ const selected = computed(() => items.value.find((i) => i.kind === form.value.ki
 
 const total = computed(() => {
   const unit = selected.value?.price_cents ?? 0
-  // 单码卡密按份数计价，与服务端一致；永久卡不受份数影响
-  const factor = form.value.kind === 'forever' ? 1 : form.value.multiplier
+  // 单码卡密按份数计价，与服务端一致；永久卡不受份数影响，自定义时间按所选数值计
+  let factor = form.value.kind === 'forever' ? 1 : form.value.multiplier
+  if (form.value.kind === 'custom') factor *= Math.max(1, form.value.value)
   return unit * form.value.qty * factor
 })
 
@@ -189,7 +190,7 @@ onMounted(load)
 
         <n-form-item label="应付">
           <n-tag type="info">{{ formatYuan(total) }} 元</n-tag>
-          <span style="margin-left: 10px; font-size: 12px; color: #8b93a7">按模板单价 × 份数 × 数量</span>
+          <span style="margin-left: 10px; font-size: 12px; color: #8b93a7">按模板单价 × 份数 × 数量（自定义时间再 × 数值）</span>
         </n-form-item>
 
         <n-button type="primary" :loading="busy" @click="issue">生成</n-button>

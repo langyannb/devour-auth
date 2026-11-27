@@ -114,6 +114,14 @@ func (s *Service) IssueByPlan(ctx context.Context, req PlanIssueReq) (IssueResul
 	if req.Kind == "forever" {
 		factor = 1
 	}
+	if req.Kind == "custom" {
+		// 自定义时间的单价按所选单位计：3 天 = 3 × 单价
+		v := req.Value
+		if v <= 0 {
+			v = 1
+		}
+		factor *= v
+	}
 	payable := unitPrice * int64(req.Qty) * factor
 	now := s.now()
 
