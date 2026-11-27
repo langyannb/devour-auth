@@ -20,6 +20,7 @@ const adminRoutes: RouteRecordRaw[] = [
     children: [
       { path: '', redirect: '/dashboard' },
       { path: 'dashboard', meta: { title: '概览' }, component: () => import('./views/Overview.vue') },
+      { path: 'analytics', meta: { title: '数据' }, component: () => import('./views/Analytics.vue') },
       { path: 'cards', meta: { title: '卡密' }, component: () => import('./views/Cards.vue') },
       { path: 'cards/:id', component: () => import('./views/CardDetail.vue') },
       { path: 'devices', meta: { title: '设备' }, component: () => import('./views/Devices.vue') },
@@ -56,6 +57,7 @@ const agentRoutes: RouteRecordRaw[] = [
     children: [
       { path: '', redirect: '/dashboard' },
       { path: 'dashboard', meta: { title: '概览' }, component: () => import('./views/agent/Dashboard.vue') },
+      { path: 'analytics', meta: { title: '数据' }, component: () => import('./views/agent/Analytics.vue') },
       { path: 'cards', meta: { title: '卡密' }, component: () => import('./views/agent/Cards.vue') },
       { path: 'issue', meta: { title: '发卡' }, component: () => import('./views/agent/Issue.vue') },
       { path: 'subagents', component: () => import('./views/agent/Subagents.vue') },

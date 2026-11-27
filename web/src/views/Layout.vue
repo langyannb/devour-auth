@@ -18,6 +18,7 @@ const initial = (user || 'A').slice(0, 1).toUpperCase()
 
 const menu = computed<MenuOption[]>(() => [
   { label: '概览', key: '/dashboard' },
+  { label: '数据', key: '/analytics' },
   {
     type: 'group',
     key: 'g-cards',

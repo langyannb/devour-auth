@@ -145,6 +145,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /admin/api/audit/verify", s.requireAdmin(s.verifyAuditChain))
 	mux.HandleFunc("GET /admin/api/stats", s.requireAdmin(s.adminStats))
 	mux.HandleFunc("GET /admin/api/stats/trend", s.requireAdmin(s.statsTrend))
+	mux.HandleFunc("GET /admin/api/analytics", s.requireAdmin(s.adminAnalytics))
 	mux.HandleFunc("GET /admin/api/health-check", s.requireAdmin(s.healthCheck))
 
 	// 黑名单 / 事件 / 财务 / 批次 / 系统状态
@@ -199,6 +200,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /agent/api/bills", s.requireAgent(s.agentBills))
 	mux.HandleFunc("GET /agent/api/subagents", s.requireAgent(s.agentSubagents))
 	mux.HandleFunc("GET /agent/api/summary", s.requireAgent(s.agentSummary))
+	mux.HandleFunc("GET /agent/api/analytics", s.requireAgent(s.agentAnalytics))
 	mux.HandleFunc("GET /agent/api/notices", s.requireAgent(s.agentNotices))
 	mux.HandleFunc("POST /agent/api/cards/{id}/ban", s.requireAgent(s.agentCardAction("ban", s.cards.Ban)))
 	mux.HandleFunc("POST /agent/api/cards/{id}/unban", s.requireAgent(s.agentCardAction("unban", s.cards.Unban)))
