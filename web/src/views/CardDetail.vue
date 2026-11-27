@@ -211,7 +211,7 @@ onMounted(load)
         <n-descriptions-item label="ID">{{ card.id }}</n-descriptions-item>
         <n-descriptions-item label="类型">{{ cardKindLabel(card.kind, durationSeconds) }}</n-descriptions-item>
         <n-descriptions-item label="到期">{{ formatExpiry(card.kind, card.expire_at, card.remaining_seconds) }}</n-descriptions-item>
-        <n-descriptions-item label="余额">
+        <n-descriptions-item label="剩余">
           <span v-if="card.kind === 'credit'">{{ card.points }} 点</span>
           <span v-else-if="card.kind === 'count'">{{ card.remain_times }} 次</span>
           <span v-else-if="card.kind === 'timed'">{{ Math.floor(card.remaining_seconds / 60) }} 分钟</span>

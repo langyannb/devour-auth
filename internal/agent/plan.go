@@ -109,7 +109,12 @@ func (s *Service) IssueByPlan(ctx context.Context, req PlanIssueReq) (IssueResul
 		duration = KindBaseSeconds[req.Kind] * req.Multiplier
 	}
 
-	payable := unitPrice * int64(req.Qty)
+	// 单码卡密按份数计价：10 份天卡 = 10 天，价格也 ×10；永久卡不受份数影响
+	factor := req.Multiplier
+	if req.Kind == "forever" {
+		factor = 1
+	}
+	payable := unitPrice * int64(req.Qty) * factor
 	now := s.now()
 
 	// 额度：-1 = 不限，其余为可用余额
