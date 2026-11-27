@@ -561,6 +561,10 @@ func (s *Server) updateAgent(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, CodeBadInput, "id 不合法")
 		return
 	}
+
+	if !s.agentAllowed(w, r, id) {
+		return
+	}
 	old, err := s.st.AgentByID(ctx, id)
 	if err != nil {
 		writeErr(w, http.StatusNotFound, CodeBadInput, "代理不存在")
@@ -601,6 +605,10 @@ func (s *Server) setAgentFrozen(frozen bool) http.HandlerFunc {
 		id, ok := pathID(r)
 		if !ok {
 			writeErr(w, http.StatusBadRequest, CodeBadInput, "id 不合法")
+			return
+		}
+
+		if !s.agentAllowed(w, r, id) {
 			return
 		}
 		status := "active"
@@ -663,6 +671,10 @@ func (s *Server) agentQuotaTopup(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(r)
 	if !ok {
 		writeErr(w, http.StatusBadRequest, CodeBadInput, "id 不合法")
+		return
+	}
+
+	if !s.agentAllowed(w, r, id) {
 		return
 	}
 	a, err := s.st.AgentByID(ctx, id)

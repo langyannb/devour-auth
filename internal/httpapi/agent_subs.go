@@ -316,6 +316,10 @@ func (s *Server) resetAgentPassword(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, CodeBadInput, "id 不合法")
 		return
 	}
+
+	if !s.agentAllowed(w, r, id) {
+		return
+	}
 	var req struct {
 		Password string `json:"password"`
 	}

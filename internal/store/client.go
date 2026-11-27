@@ -67,6 +67,14 @@ func (s *Store) TouchDeviceTx(ctx context.Context, tx *sql.Tx, id, now int64) er
 	return err
 }
 
+// SessionCardApp 会话所属卡的应用，用于限制跨应用操作。
+func (s *Store) SessionCardApp(ctx context.Context, sessionID int64) (int64, error) {
+	var app int64
+	err := s.db.QueryRowContext(ctx,
+		`SELECT c.app_id FROM sessions se JOIN cards c ON c.id = se.card_id WHERE se.id = ?`, sessionID).Scan(&app)
+	return app, err
+}
+
 func (s *Store) DeviceByID(ctx context.Context, id int64) (Device, error) {
 	d, err := scanDevice(s.db.QueryRowContext(ctx,
 		`SELECT `+deviceCols+` FROM devices WHERE id = ?`, id))

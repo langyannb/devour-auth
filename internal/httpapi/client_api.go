@@ -49,6 +49,7 @@ func bearer(r *http.Request) string {
 }
 
 type clientLoginReq struct {
+	App    string `json:"app"` // 应用 code；不传则用第一个应用
 	Kami   string `json:"kami"`
 	Device struct {
 		Fingerprint string `json:"fingerprint"`
@@ -76,7 +77,20 @@ func (s *Server) clientLogin(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusTooManyRequests, CodeRateLimited, "尝试过于频繁")
 		return
 	}
+	appID := int64(0)
+	if req.App != "" {
+		app, err := s.st.AppByCode(r.Context(), req.App)
+		if err != nil {
+			writeErr(w, http.StatusBadRequest, CodeBadInput, "应用不存在")
+			return
+		}
+		appID = app.ID
+	} else if apps, err := s.st.ListApps(r.Context()); err == nil && len(apps) > 0 {
+		// 兼容旧客户端：不带 app 时只认第一个应用的卡，避免两套卡串用
+		appID = apps[0].ID
+	}
 	res, err := s.clients.Login(r.Context(), clientauth.LoginReq{
+		AppID:       appID,
 		Kami:        strings.TrimSpace(req.Kami),
 		Fingerprint: req.Device.Fingerprint,
 		Model:       req.Device.Model,
@@ -183,6 +197,10 @@ func (s *Server) grantCardEntitlement(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, CodeBadInput, "id 不合法")
 		return
 	}
+
+	if !s.cardAllowed(w, r, id) {
+		return
+	}
 	var req cardEntReq
 	if !decode(w, r, &req) {
 		return
@@ -236,6 +254,10 @@ func (s *Server) revokeCardEntitlement(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(r)
 	if !ok {
 		writeErr(w, http.StatusBadRequest, CodeBadInput, "id 不合法")
+		return
+	}
+
+	if !s.cardAllowed(w, r, id) {
 		return
 	}
 	var req cardEntReq

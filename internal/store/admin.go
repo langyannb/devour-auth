@@ -20,6 +20,7 @@ type Admin struct {
 	TotpSecret  string // 空 = 未启用 TOTP
 	IPAllow     string
 	LockedUntil int64
+	AppID       int64 // 0 = 全局，>0 只能看这个应用
 }
 
 func (s *Store) AdminByUsername(ctx context.Context, username string) (Admin, error) {
@@ -28,9 +29,9 @@ func (s *Store) AdminByUsername(ctx context.Context, username string) (Admin, er
 		totp, ip sql.NullString
 	)
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, username, pass_hash, role, totp_secret, ip_allow, locked_until
+		`SELECT id, username, pass_hash, role, totp_secret, ip_allow, locked_until, app_id
 		   FROM admins WHERE username = ?`, username).
-		Scan(&a.ID, &a.Username, &a.PassHash, &a.Role, &totp, &ip, &a.LockedUntil)
+		Scan(&a.ID, &a.Username, &a.PassHash, &a.Role, &totp, &ip, &a.LockedUntil, &a.AppID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Admin{}, ErrNotFound
 	}
@@ -47,9 +48,9 @@ func (s *Store) AdminByID(ctx context.Context, id int64) (Admin, error) {
 		totp, ip sql.NullString
 	)
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, username, pass_hash, role, totp_secret, ip_allow, locked_until
+		`SELECT id, username, pass_hash, role, totp_secret, ip_allow, locked_until, app_id
 		   FROM admins WHERE id = ?`, id).
-		Scan(&a.ID, &a.Username, &a.PassHash, &a.Role, &totp, &ip, &a.LockedUntil)
+		Scan(&a.ID, &a.Username, &a.PassHash, &a.Role, &totp, &ip, &a.LockedUntil, &a.AppID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Admin{}, ErrNotFound
 	}
@@ -83,11 +84,11 @@ func (s *Store) AdminCount(ctx context.Context) (int, error) {
 	return n, err
 }
 
-func (s *Store) CreateAdmin(ctx context.Context, username, passHash, role, totpSecret string, now int64) (int64, error) {
+func (s *Store) CreateAdmin(ctx context.Context, username, passHash, role, totpSecret string, appID, now int64) (int64, error) {
 	res, err := s.db.ExecContext(ctx,
-		`INSERT INTO admins(username, pass_hash, role, totp_secret, created_at)
-		 VALUES(?, ?, ?, NULLIF(?, ''), ?)`,
-		username, passHash, role, totpSecret, now)
+		`INSERT INTO admins(username, pass_hash, role, totp_secret, app_id, created_at)
+		 VALUES(?, ?, ?, NULLIF(?, ''), ?, ?)`,
+		username, passHash, role, totpSecret, appID, now)
 	if err != nil {
 		return 0, err
 	}

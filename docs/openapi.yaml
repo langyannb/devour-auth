@@ -575,6 +575,9 @@ components:
       type: object
       required: [kami, device, ts, nonce]
       properties:
+        app:
+          type: string
+          description: 应用 code；不传只认第一个应用的卡，传了必须与卡所属应用一致
         kami: { type: string }
         device: { $ref: '#/components/schemas/DeviceInfo' }
         ts: { type: integer, format: int64, description: 客户端当前 Unix 秒，与服务端偏差不得超过 300 秒 }

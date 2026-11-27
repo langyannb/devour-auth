@@ -69,6 +69,7 @@ func (n *nonceSet) Use(nonce string, now time.Time, ttl time.Duration) bool {
 // ---------- 请求与视图 ----------
 
 type LoginReq struct {
+	AppID       int64 // 0 = 不限定应用（兼容旧客户端）
 	Kami        string
 	Fingerprint string
 	Model       string
@@ -133,7 +134,7 @@ func (s *Service) Login(ctx context.Context, req LoginReq, ip, ua string) (Sessi
 	}
 	defer tx.Rollback()
 
-	row, err := s.st.CardByKamiTx(ctx, tx, req.Kami)
+	row, err := s.st.CardByKamiTx(ctx, tx, req.AppID, req.Kami)
 	if errors.Is(err, store.ErrNotFound) {
 		return SessionView{}, apierr.New(apierr.CardNotFound, "卡密不存在")
 	} else if err != nil {

@@ -13,8 +13,82 @@ import (
 	"github.com/langyannb/devour-auth/internal/store"
 )
 
+// adminScopeID 会话可操作的应用：绑定应用的账号只能用自己的，0 = 全局。
+func adminScopeID(r *http.Request) int64 {
+	if c, ok := r.Context().Value(adminCtxKey{}).(adminCtx); ok && c.Admin.AppID > 0 {
+		return c.Admin.AppID
+	}
+	return 0
+}
+
+// effectiveAppID 当前请求实际生效的应用：绑定账号强制自己的，其余按 ?app_id=（0 = 全部）。
+func effectiveAppID(r *http.Request) int64 {
+	if id := adminScopeID(r); id > 0 {
+		return id
+	}
+	return queryInt64(r, "app_id")
+}
+
+// 以下四个 helper 防跨应用越权：受限账号按 id 操作别的应用的对象一律 404。
+
+func (s *Server) cardAllowed(w http.ResponseWriter, r *http.Request, cardID int64) bool {
+	scope := adminScopeID(r)
+	if scope == 0 {
+		return true
+	}
+	c, err := s.st.CardByID(r.Context(), cardID)
+	if err != nil || c.AppID != scope {
+		writeErr(w, http.StatusNotFound, CodeBadInput, "卡不存在")
+		return false
+	}
+	return true
+}
+
+func (s *Server) agentAllowed(w http.ResponseWriter, r *http.Request, agentID int64) bool {
+	scope := adminScopeID(r)
+	if scope == 0 {
+		return true
+	}
+	a, err := s.st.AgentByID(r.Context(), agentID)
+	if err != nil || a.AppID != scope {
+		writeErr(w, http.StatusNotFound, CodeBadInput, "代理不存在")
+		return false
+	}
+	return true
+}
+
+func (s *Server) deviceAllowed(w http.ResponseWriter, r *http.Request, deviceID int64) bool {
+	scope := adminScopeID(r)
+	if scope == 0 {
+		return true
+	}
+	d, err := s.st.DeviceByID(r.Context(), deviceID)
+	if err != nil {
+		writeErr(w, http.StatusNotFound, CodeBadInput, "设备不存在")
+		return false
+	}
+	return s.cardAllowed(w, r, d.CardID)
+}
+
+func (s *Server) sessionAllowed(w http.ResponseWriter, r *http.Request, sessionID int64) bool {
+	scope := adminScopeID(r)
+	if scope == 0 {
+		return true
+	}
+	app, err := s.st.SessionCardApp(r.Context(), sessionID)
+	if err != nil || app != scope {
+		writeErr(w, http.StatusNotFound, CodeBadInput, "会话不存在")
+		return false
+	}
+	return true
+}
+
 // appFromQuery 解析当前应用：优先 ?app_id=，其次 ?app=code，都没有则取第一个。
+// 绑定应用的账号忽略入参，直接用自己的应用。
 func (s *Server) appFromQuery(r *http.Request) (store.App, error) {
+	if id := adminScopeID(r); id > 0 {
+		return s.st.AppByID(r.Context(), id)
+	}
 	if id := queryInt64(r, "app_id"); id > 0 {
 		return s.st.AppByID(r.Context(), id)
 	}

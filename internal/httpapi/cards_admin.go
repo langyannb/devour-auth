@@ -19,6 +19,10 @@ func (s *Server) patchCard(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, CodeBadInput, "id 不合法")
 		return
 	}
+
+	if !s.cardAllowed(w, r, id) {
+		return
+	}
 	var req struct {
 		DeviceLimit  *int64  `json:"device_limit"`
 		VerifyDevice *bool   `json:"verify_device"`
@@ -134,7 +138,7 @@ func (s *Server) batchCards(w http.ResponseWriter, r *http.Request) {
 // exportCards 导出 CSV（带 BOM，Excel 直接打开不乱码）。
 func (s *Server) exportCards(w http.ResponseWriter, r *http.Request) {
 	filter := store.CardFilter{
-		AppID:    queryInt64(r, "app_id"),
+		AppID:    effectiveAppID(r),
 		Status:   r.URL.Query().Get("status"),
 		PolicyID: queryInt64(r, "policy_id"),
 		Kami:     r.URL.Query().Get("kami"),

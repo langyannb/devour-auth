@@ -82,6 +82,9 @@ Devour Auth 是一套自建的软件授权与卡密验证系统：服务端、�
 规则：
 
 - `admins` 与 `agents` 是两张独立的表、两套登录、两套会话域。
+- 管理账号可以绑定一个应用（`admins.app_id`）：绑定后所有管理接口只作用于该应用
+  （查询无视传入的 `app_id`，按 id 操作别的应用的对象一律 404），账号/审计/安全/运营/应用管理
+  只对全局管理员开放。TOTP 按账号可选，不绑 `totp_secret` 的账号登录不需要动态码。
 - 三端各用独立子域：`admin.namikao.com` / `agent.namikao.com` / `net.namikao.com`，
   cookie 按域天然隔离；服务端 `hostGuard` 再按子域限制可达路径。
 - `/admin/*` 只认 admin 会话，`/agent/*` 只认 agent 会话，交叉访问一律 `403`。
@@ -112,6 +115,7 @@ CREATE TABLE admins (
   totp_secret   TEXT,
   ip_allow      TEXT,                        -- 逗号分隔网段，空=不限
   locked_until  INTEGER NOT NULL DEFAULT 0,
+  app_id        INTEGER NOT NULL DEFAULT 0,  -- 0 = 全局；>0 = 只能管这个应用
   created_at    INTEGER NOT NULL
 );
 
@@ -534,8 +538,11 @@ RATE_LIMITED / MAINTENANCE / INTERNAL`。
 
 `POST /v1/auth/login`
 
+`app` 是应用 code；不传时只认第一个应用的卡（旧客户端兼容），传了就必须和卡所属应用一致。
+
 ```json
 {
+  "app": "devour",
   "kami": "DV-...",
   "device": { "fingerprint": "...", "model": "...", "brand": "...", "os": "...", "app_version": "2.0.0" },
   "ts": 1795709714,

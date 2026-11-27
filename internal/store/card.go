@@ -134,9 +134,14 @@ func (s *Store) CardByKami(ctx context.Context, kami string) (Card, error) {
 	return c, err
 }
 
-func (s *Store) CardByKamiTx(ctx context.Context, tx *sql.Tx, kami string) (Card, error) {
-	c, err := scanCard(tx.QueryRowContext(ctx,
-		`SELECT `+cardCols+` FROM cards WHERE kami = ?`, kami))
+func (s *Store) CardByKamiTx(ctx context.Context, tx *sql.Tx, appID int64, kami string) (Card, error) {
+	q := `SELECT ` + cardCols + ` FROM cards WHERE kami = ?`
+	args := []any{kami}
+	if appID > 0 {
+		q += ` AND app_id = ?`
+		args = append(args, appID)
+	}
+	c, err := scanCard(tx.QueryRowContext(ctx, q, args...))
 	if errors.Is(err, sql.ErrNoRows) {
 		return Card{}, ErrNotFound
 	}

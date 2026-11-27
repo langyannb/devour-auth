@@ -44,10 +44,10 @@ func setup(t *testing.T, tweak ...func(*httpapi.Options)) env {
 		t.Fatal(err)
 	}
 	// 测试账号不带 TOTP，登录只要密码
-	if _, err := st.CreateAdmin(ctx, "admin", hash, "admin", "", 1000); err != nil {
+	if _, err := st.CreateAdmin(ctx, "admin", hash, "admin", "", 0, 1000); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := st.CreateAdmin(ctx, "op", hash, "operator", "", 1000); err != nil {
+	if _, err := st.CreateAdmin(ctx, "op", hash, "operator", "", 0, 1000); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := st.EnsureApp(ctx, "devour", "Devour", 1000); err != nil {

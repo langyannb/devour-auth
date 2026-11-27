@@ -84,9 +84,13 @@ func (s *Store) BlacklistedTx(ctx context.Context, tx *sql.Tx, appID int64, kind
 
 // ---------- 事件日志 ----------
 
-func (s *Store) ListEvents(ctx context.Context, cardID int64, kind string, limit, offset int) ([]Event, int64, error) {
+func (s *Store) ListEvents(ctx context.Context, appID, cardID int64, kind string, limit, offset int) ([]Event, int64, error) {
 	where := ` WHERE 1=1`
 	var args []any
+	if appID > 0 {
+		where += ` AND card_id IN (SELECT id FROM cards WHERE app_id = ?)`
+		args = append(args, appID)
+	}
 	if cardID > 0 {
 		where += ` AND card_id = ?`
 		args = append(args, cardID)

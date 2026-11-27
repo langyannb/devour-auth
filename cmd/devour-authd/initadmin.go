@@ -56,7 +56,7 @@ func runInitAdmin(cfg config.Config) error {
 	}
 	secret := base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(raw)
 
-	if _, err := st.CreateAdmin(ctx, cfg.AdminUser, passHash, "admin", secret, time.Now().Unix()); err != nil {
+	if _, err := st.CreateAdmin(ctx, cfg.AdminUser, passHash, "admin", secret, 0, time.Now().Unix()); err != nil {
 		return err
 	}
 	// 首个应用：表结构支持多个，当前只有 devour（design.md 第 3 节）。

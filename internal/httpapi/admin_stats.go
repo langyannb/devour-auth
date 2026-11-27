@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/langyannb/devour-auth/internal/store"
+
 	"github.com/langyannb/devour-auth/internal/audit"
 )
 
@@ -12,7 +14,7 @@ import (
 func (s *Server) adminStats(w http.ResponseWriter, r *http.Request) {
 	now := s.now()
 	dayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location()).Unix()
-	appID := queryInt64(r, "app_id")
+	appID := effectiveAppID(r)
 	st, err := s.st.Stats(r.Context(), appID, dayStart, now.Unix())
 	if err != nil {
 		internalErr(w, s.log, "统计失败", err)
@@ -35,8 +37,14 @@ func (s *Server) statsTrend(w http.ResponseWriter, r *http.Request) {
 	if days <= 0 || days > 90 {
 		days = 14
 	}
-	since := s.now().AddDate(0, 0, -(days - 1)).Format("2006-01-02")
-	list, err := s.st.ListDailyStats(r.Context(), since)
+	sinceDay, since := analyticsSince(s.now(), days)
+	var list []store.DailyStat
+	var err error
+	if appID := effectiveAppID(r); appID > 0 {
+		list, err = s.st.AppDailyTrend(r.Context(), appID, since)
+	} else {
+		list, err = s.st.ListDailyStats(r.Context(), sinceDay)
+	}
 	if err != nil {
 		internalErr(w, s.log, "查趋势失败", err)
 		return

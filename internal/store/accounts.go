@@ -15,10 +15,11 @@ type AdminAccount struct {
 	LockedUntil int64
 	CreatedAt   int64
 	UnusedCodes int64
+	AppID       int64
 }
 
 const adminAccountCols = `a.id, a.username, a.role, a.totp_secret IS NOT NULL, COALESCE(a.ip_allow, ''), a.locked_until, a.created_at,
-	(SELECT COUNT(*) FROM admin_recovery_codes r WHERE r.admin_id = a.id AND r.used_at IS NULL)`
+	(SELECT COUNT(*) FROM admin_recovery_codes r WHERE r.admin_id = a.id AND r.used_at IS NULL), a.app_id`
 
 func (s *Store) ListAdminAccounts(ctx context.Context) ([]AdminAccount, error) {
 	rows, err := s.db.QueryContext(ctx,
@@ -31,7 +32,7 @@ func (s *Store) ListAdminAccounts(ctx context.Context) ([]AdminAccount, error) {
 	for rows.Next() {
 		var a AdminAccount
 		if err := rows.Scan(&a.ID, &a.Username, &a.Role, &a.TotpEnabled, &a.IPAllow,
-			&a.LockedUntil, &a.CreatedAt, &a.UnusedCodes); err != nil {
+			&a.LockedUntil, &a.CreatedAt, &a.UnusedCodes, &a.AppID); err != nil {
 			return nil, err
 		}
 		out = append(out, a)
@@ -44,7 +45,7 @@ func (s *Store) AdminAccountByID(ctx context.Context, id int64) (AdminAccount, e
 	err := s.db.QueryRowContext(ctx,
 		`SELECT `+adminAccountCols+` FROM admins a WHERE a.id = ?`, id).
 		Scan(&a.ID, &a.Username, &a.Role, &a.TotpEnabled, &a.IPAllow,
-			&a.LockedUntil, &a.CreatedAt, &a.UnusedCodes)
+			&a.LockedUntil, &a.CreatedAt, &a.UnusedCodes, &a.AppID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return AdminAccount{}, ErrNotFound
 	}

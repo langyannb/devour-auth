@@ -24,7 +24,7 @@ func createIPAdmin(t *testing.T, e env, username, ipAllow string) int64 {
 	if err != nil {
 		t.Fatal(err)
 	}
-	id, err := e.st.CreateAdmin(context.Background(), username, hash, "admin", "", 1000)
+	id, err := e.st.CreateAdmin(context.Background(), username, hash, "admin", "", 0, 1000)
 	if err != nil {
 		t.Fatal(err)
 	}

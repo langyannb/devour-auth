@@ -146,7 +146,7 @@ func (s *Server) adminLogin(w http.ResponseWriter, r *http.Request) {
 	writeData(w, map[string]any{
 		"csrf_token":  csrf,
 		"expires_at":  expires,
-		"admin":       map[string]any{"id": a.ID, "username": a.Username, "role": a.Role},
+		"admin":       map[string]any{"id": a.ID, "username": a.Username, "role": a.Role, "app_id": a.AppID},
 		"server_time": now.Unix(),
 	})
 }
@@ -167,6 +167,7 @@ func (s *Server) adminMe(w http.ResponseWriter, r *http.Request) {
 		"username":     c.Admin.Username,
 		"role":         c.Admin.Role,
 		"totp_enabled": c.Admin.TotpSecret != "",
+		"app_id":       c.Admin.AppID,
 		"reauth_until": c.Session.ReauthUntil,
 		// 刷新/新标签页后 sessionStorage 是空的，这里补一次 CSRF
 		"csrf_token":  c.Session.CSRF,
@@ -255,6 +256,17 @@ func (s *Server) requireAdmin(next http.HandlerFunc) http.HandlerFunc {
 		}
 		_ = s.st.TouchAdminSession(ctx, sess.ID, now)
 		next(w, r.WithContext(context.WithValue(r.Context(), adminCtxKey{}, adminCtx{Admin: admin, Session: sess})))
+	}
+}
+
+// requireGlobal 只有全局管理员（不绑应用）才能进的板块：账号、审计、安全体检、运营、应用管理。
+func (s *Server) requireGlobal(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if adminFrom(r).Admin.AppID > 0 {
+			writeErr(w, http.StatusForbidden, CodeUnauthorized, "该账号只能管理自己绑定的应用")
+			return
+		}
+		next(w, r)
 	}
 }
 

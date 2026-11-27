@@ -72,8 +72,12 @@ func (s *Server) listApps(w http.ResponseWriter, r *http.Request) {
 		internalErr(w, s.log, "查应用失败", err)
 		return
 	}
+	scope := adminScopeID(r)
 	out := make([]map[string]any, 0, len(apps))
 	for _, a := range apps {
+		if scope > 0 && a.ID != scope {
+			continue
+		}
 		out = append(out, appJSON(a))
 	}
 	writeData(w, out)
@@ -186,7 +190,7 @@ func (s *Server) createPolicy(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, CodeBadInput, "code / name / kind 必填且 kind 合法")
 		return
 	}
-	appID := queryInt64(r, "app_id")
+	appID := effectiveAppID(r)
 	if appID <= 0 {
 		apps, err := s.st.ListApps(ctx)
 		if err != nil || len(apps) == 0 {
@@ -288,7 +292,7 @@ func entJSON(e store.Entitlement) map[string]any {
 }
 
 func (s *Server) listEntitlements(w http.ResponseWriter, r *http.Request) {
-	es, err := s.st.ListEntitlements(r.Context(), queryInt64(r, "app_id"))
+	es, err := s.st.ListEntitlements(r.Context(), effectiveAppID(r))
 	if err != nil {
 		internalErr(w, s.log, "查权限失败", err)
 		return
@@ -317,7 +321,7 @@ func (s *Server) createEntitlement(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, CodeBadInput, "code / name 必填，成本不能为负")
 		return
 	}
-	appID := queryInt64(r, "app_id")
+	appID := effectiveAppID(r)
 	if appID <= 0 {
 		apps, err := s.st.ListApps(ctx)
 		if err != nil || len(apps) == 0 {
@@ -440,7 +444,7 @@ func (s *Server) cardListJSON(ctx context.Context, cards []store.Card) ([]map[st
 
 func (s *Server) listCards(w http.ResponseWriter, r *http.Request) {
 	cards, total, err := s.st.ListCards(r.Context(), store.CardFilter{
-		AppID:    queryInt64(r, "app_id"),
+		AppID:    effectiveAppID(r),
 		Status:   r.URL.Query().Get("status"),
 		PolicyID: queryInt64(r, "policy_id"),
 		Kami:     r.URL.Query().Get("kami"),
@@ -466,7 +470,7 @@ func (s *Server) getCard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	c, err := s.st.CardByID(r.Context(), id)
-	if err != nil {
+	if err != nil || (adminScopeID(r) > 0 && c.AppID != adminScopeID(r)) {
 		writeErr(w, http.StatusNotFound, CodeBadInput, "卡不存在")
 		return
 	}
@@ -489,6 +493,10 @@ func (s *Server) cardStatusAction(action string, fn func(context.Context, int64,
 		id, ok := pathID(r)
 		if !ok {
 			writeErr(w, http.StatusBadRequest, CodeBadInput, "id 不合法")
+			return
+		}
+
+		if !s.cardAllowed(w, r, id) {
 			return
 		}
 		c := adminFrom(r)
@@ -523,6 +531,10 @@ func (s *Server) extendCard(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(r)
 	if !ok {
 		writeErr(w, http.StatusBadRequest, CodeBadInput, "id 不合法")
+		return
+	}
+
+	if !s.cardAllowed(w, r, id) {
 		return
 	}
 	var req extendReq

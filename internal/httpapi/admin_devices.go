@@ -22,7 +22,7 @@ func deviceJSON(d store.Device) map[string]any {
 
 func (s *Server) listDevices(w http.ResponseWriter, r *http.Request) {
 	list, total, err := s.st.ListDevices(r.Context(),
-		queryInt64(r, "card_id"), queryInt64(r, "app_id"),
+		queryInt64(r, "card_id"), effectiveAppID(r),
 		r.URL.Query().Get("fingerprint"),
 		r.URL.Query().Get("all") == "1",
 		int(queryInt64(r, "limit")), int(queryInt64(r, "offset")))
@@ -43,6 +43,10 @@ func (s *Server) deviceAction(action string) http.HandlerFunc {
 		id, ok := pathID(r)
 		if !ok {
 			writeErr(w, http.StatusBadRequest, CodeBadInput, "id 不合法")
+			return
+		}
+
+		if !s.deviceAllowed(w, r, id) {
 			return
 		}
 		ctx := r.Context()
@@ -78,7 +82,7 @@ func sessionJSON(sr store.SessionRow) map[string]any {
 }
 
 func (s *Server) listSessions(w http.ResponseWriter, r *http.Request) {
-	list, total, err := s.st.ListSessions(r.Context(), queryInt64(r, "app_id"), s.now().Unix(),
+	list, total, err := s.st.ListSessions(r.Context(), effectiveAppID(r), s.now().Unix(),
 		int(queryInt64(r, "limit")), int(queryInt64(r, "offset")))
 	if err != nil {
 		internalErr(w, s.log, "查在线会话失败", err)
@@ -97,6 +101,10 @@ func (s *Server) revokeSession(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, CodeBadInput, "id 不合法")
 		return
 	}
+
+	if !s.sessionAllowed(w, r, id) {
+		return
+	}
 	ctx := r.Context()
 	if err := s.st.RevokeSessionByID(ctx, id, s.now().Unix()); err != nil {
 		internalErr(w, s.log, "踢下线失败", err)
@@ -111,6 +119,10 @@ func (s *Server) listCardDevices(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(r)
 	if !ok {
 		writeErr(w, http.StatusBadRequest, CodeBadInput, "id 不合法")
+		return
+	}
+
+	if !s.cardAllowed(w, r, id) {
 		return
 	}
 	list, _, err := s.st.ListDevices(r.Context(), id, 0, "", true, 100, 0)
@@ -129,6 +141,10 @@ func (s *Server) listCardSessions(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(r)
 	if !ok {
 		writeErr(w, http.StatusBadRequest, CodeBadInput, "id 不合法")
+		return
+	}
+
+	if !s.cardAllowed(w, r, id) {
 		return
 	}
 	list, _, err := s.st.ListSessionsByCard(r.Context(), id, 50, 0)

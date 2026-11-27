@@ -101,7 +101,7 @@ func (s *Server) setAgentPlan(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, CodeBadInput, "id 不合法")
 		return
 	}
-	if _, err := s.st.AgentByID(ctx, id); err != nil {
+	if a, err := s.st.AgentByID(ctx, id); err != nil || (adminScopeID(r) > 0 && a.AppID != adminScopeID(r)) {
 		writeErr(w, http.StatusNotFound, CodeBadInput, "代理不存在")
 		return
 	}

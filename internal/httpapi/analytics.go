@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/langyannb/devour-auth/internal/geo"
+	"github.com/langyannb/devour-auth/internal/store"
 )
 
 // analyticsDays 数据大屏的时间窗口：7–90 天，默认 30。
@@ -31,12 +32,18 @@ func analyticsSince(now time.Time, days int) (string, int64) {
 // adminAnalytics 管理端数据大屏：趋势、卡类型、状态、代理排行。
 func (s *Server) adminAnalytics(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	appID := queryInt64(r, "app_id")
+	appID := effectiveAppID(r)
 	days := analyticsDays(r)
 	now := s.now()
 	sinceDay, since := analyticsSince(now, days)
 
-	trend, err := s.st.ListDailyStats(ctx, sinceDay)
+	var trend []store.DailyStat
+	var err error
+	if appID > 0 {
+		trend, err = s.st.AppDailyTrend(ctx, appID, since)
+	} else {
+		trend, err = s.st.ListDailyStats(ctx, sinceDay)
+	}
 	if err != nil {
 		internalErr(w, s.log, "查趋势失败", err)
 		return

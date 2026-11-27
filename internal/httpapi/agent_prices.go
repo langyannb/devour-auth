@@ -25,7 +25,7 @@ func (s *Server) listAgentPrices(w http.ResponseWriter, r *http.Request) {
 		writeData(w, []map[string]any{})
 		return
 	}
-	appID := queryInt64(r, "app_id")
+	appID := effectiveAppID(r)
 	if appID <= 0 {
 		appID = apps[0].ID
 	}
@@ -72,7 +72,7 @@ func (s *Server) setAgentPrices(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, CodeBadInput, "id 不合法")
 		return
 	}
-	if _, err := s.st.AgentByID(ctx, id); err != nil {
+	if a, err := s.st.AgentByID(ctx, id); err != nil || (adminScopeID(r) > 0 && a.AppID != adminScopeID(r)) {
 		writeErr(w, http.StatusNotFound, CodeBadInput, "代理不存在")
 		return
 	}

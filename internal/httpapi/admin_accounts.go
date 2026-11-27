@@ -43,6 +43,7 @@ func accountRow(a store.AdminAccount) map[string]any {
 		"totp_enabled": a.TotpEnabled, "ip_allow": a.IPAllow,
 		"locked_until": a.LockedUntil,
 		"created_at":   a.CreatedAt, "unused_recovery_codes": a.UnusedCodes,
+		"app_id": a.AppID,
 	}
 }
 
@@ -65,6 +66,7 @@ func (s *Server) createAccount(w http.ResponseWriter, r *http.Request) {
 		Username string `json:"username"`
 		Password string `json:"password"`
 		Role     string `json:"role"`
+		AppID    int64  `json:"app_id"` // 0 = 全局，>0 = 只能管理这个应用
 	}
 	if !decode(w, r, &req) {
 		return
@@ -95,7 +97,13 @@ func (s *Server) createAccount(w http.ResponseWriter, r *http.Request) {
 		internalErr(w, s.log, "哈希失败", err)
 		return
 	}
-	id, err := s.st.CreateAdmin(ctx, req.Username, hash, req.Role, "", s.now().Unix())
+	if req.AppID > 0 {
+		if _, err := s.st.AppByID(ctx, req.AppID); err != nil {
+			writeErr(w, http.StatusBadRequest, CodeBadInput, "应用不存在")
+			return
+		}
+	}
+	id, err := s.st.CreateAdmin(ctx, req.Username, hash, req.Role, "", req.AppID, s.now().Unix())
 	if err != nil {
 		writeErr(w, http.StatusConflict, CodeBadInput, "用户名已存在")
 		return
@@ -111,11 +119,11 @@ func (s *Server) createAccount(w http.ResponseWriter, r *http.Request) {
 	}
 	c := adminFrom(r)
 	_ = s.writeAudit(ctx, c, "admin.create", fmt.Sprintf("admin:%d", id), "",
-		fmt.Sprintf(`{"username":%q,"role":%q}`, req.Username, req.Role), clientIP(r))
+		fmt.Sprintf(`{"username":%q,"role":%q,"app_id":%d}`, req.Username, req.Role, req.AppID), clientIP(r))
 
 	// 密码与恢复码只在这里返回一次
 	writeData(w, map[string]any{
-		"id": id, "username": req.Username, "role": req.Role,
+		"id": id, "username": req.Username, "role": req.Role, "app_id": req.AppID,
 		"password": password, "recovery_codes": plain,
 		"hint": "密码和恢复码只显示这一次",
 	})
