@@ -120,6 +120,30 @@ func (s *Store) AgentDailyCards(ctx context.Context, ids []int64, since int64) (
 	return out, nil
 }
 
+// ActiveDevices 区间内活跃过的设备数（按最后活跃时间）。
+func (s *Store) ActiveDevices(ctx context.Context, appID, since int64) (int64, error) {
+	var n int64
+	err := s.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM devices d JOIN cards c ON c.id = d.card_id
+		  WHERE d.unbound_at IS NULL AND d.last_seen >= ? AND (? = 0 OR c.app_id = ?)`,
+		since, appID, appID).Scan(&n)
+	return n, err
+}
+
+// AgentActiveDevices 代理可见范围内区间活跃设备数。
+func (s *Store) AgentActiveDevices(ctx context.Context, ids []int64, since int64) (int64, error) {
+	in, args := idList(ids)
+	if in == "" {
+		return 0, nil
+	}
+	var n int64
+	err := s.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM devices d JOIN cards c ON c.id = d.card_id
+		  WHERE d.unbound_at IS NULL AND d.last_seen >= ? AND c.agent_id IN (`+in+`)`,
+		append([]any{since}, args...)...).Scan(&n)
+	return n, err
+}
+
 func (s *Store) buckets(ctx context.Context, q string, args ...any) ([]Bucket, error) {
 	rows, err := s.db.QueryContext(ctx, q, args...)
 	if err != nil {

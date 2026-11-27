@@ -26,6 +26,7 @@ interface Analytics {
   agents_active: number
   online_sessions: number
   activations_day: number
+  active_devices: number
   server_time: number
 }
 
@@ -140,6 +141,11 @@ onMounted(load)
         <span class="k">{{ days }} 天激活</span>
         <span class="v">{{ periodActivations }}</span>
         <span class="sub">今日 {{ data?.activations_day ?? 0 }} 张</span>
+      </div>
+      <div class="stat">
+        <span class="k">{{ days }} 天活跃设备</span>
+        <span class="v">{{ data?.active_devices ?? '—' }}</span>
+        <span class="sub">其中已绑定 {{ data?.devices_bound ?? 0 }} 台</span>
       </div>
       <div class="stat">
         <span class="k">活跃代理</span>

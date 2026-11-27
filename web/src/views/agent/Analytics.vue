@@ -13,6 +13,7 @@ interface Analytics {
   trend: Point[]
   by_kind: { key: string; count: number }[]
   by_status: { key: string; count: number }[]
+  active_devices: number
   quota_cents: number
   level: number
   server_time: number
@@ -126,6 +127,11 @@ onMounted(load)
         <span class="k">卡密总数</span>
         <span class="v">{{ cardsTotal }}</span>
         <span class="sub">你与下级的全部卡</span>
+      </div>
+      <div class="stat">
+        <span class="k">{{ days }} 天活跃设备</span>
+        <span class="v">{{ data?.active_devices ?? '—' }}</span>
+        <span class="sub">登录过的设备</span>
       </div>
     </div>
 

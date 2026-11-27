@@ -30,7 +30,7 @@ func (s *Server) adminAnalytics(w http.ResponseWriter, r *http.Request) {
 	appID := queryInt64(r, "app_id")
 	days := analyticsDays(r)
 	now := s.now()
-	sinceDay, _ := analyticsSince(now, days)
+	sinceDay, since := analyticsSince(now, days)
 
 	trend, err := s.st.ListDailyStats(ctx, sinceDay)
 	if err != nil {
@@ -53,6 +53,11 @@ func (s *Server) adminAnalytics(w http.ResponseWriter, r *http.Request) {
 		internalErr(w, s.log, "统计失败", err)
 		return
 	}
+	activeDevices, err := s.st.ActiveDevices(ctx, appID, since)
+	if err != nil {
+		internalErr(w, s.log, "查活跃设备失败", err)
+		return
+	}
 	writeData(w, map[string]any{
 		"days":            days,
 		"trend":           trend,
@@ -64,6 +69,7 @@ func (s *Server) adminAnalytics(w http.ResponseWriter, r *http.Request) {
 		"agents_active":   st.AgentsActive,
 		"online_sessions": st.OnlineSessions,
 		"activations_day": st.ActivationsDay,
+		"active_devices":  activeDevices,
 		"server_time":     now.Unix(),
 	})
 }
@@ -96,13 +102,19 @@ func (s *Server) agentAnalytics(w http.ResponseWriter, r *http.Request) {
 		internalErr(w, s.log, "查出卡趋势失败", err)
 		return
 	}
+	activeDevices, err := s.st.AgentActiveDevices(ctx, ids, since)
+	if err != nil {
+		internalErr(w, s.log, "查活跃设备失败", err)
+		return
+	}
 	writeData(w, map[string]any{
-		"days":        days,
-		"trend":       daily,
-		"by_kind":     kinds,
-		"by_status":   statuses,
-		"quota_cents": c.Agent.QuotaCents,
-		"level":       c.Agent.Level,
-		"server_time": now.Unix(),
+		"days":           days,
+		"trend":          daily,
+		"by_kind":        kinds,
+		"by_status":      statuses,
+		"active_devices": activeDevices,
+		"quota_cents":    c.Agent.QuotaCents,
+		"level":          c.Agent.Level,
+		"server_time":    now.Unix(),
 	})
 }
