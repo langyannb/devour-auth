@@ -26,7 +26,6 @@ const adminRoutes: RouteRecordRaw[] = [
       { path: 'devices', meta: { title: '设备' }, component: () => import('./views/Devices.vue') },
       { path: 'sessions', meta: { title: '在线会话' }, component: () => import('./views/Sessions.vue') },
       { path: 'issue', meta: { title: '发卡' }, component: () => import('./views/Issue.vue') },
-      { path: 'policies', meta: { title: '策略' }, component: () => import('./views/Policies.vue') },
       { path: 'entitlements', meta: { title: '权限包' }, component: () => import('./views/Entitlements.vue') },
       { path: 'apps', meta: { title: '应用' }, component: () => import('./views/Apps.vue') },
       { path: 'accounts', meta: { title: '账号' }, component: () => import('./views/Accounts.vue') },
@@ -42,6 +41,7 @@ const adminRoutes: RouteRecordRaw[] = [
       { path: 'audit', meta: { title: '审计' }, component: () => import('./views/Audit.vue') },
       { path: 'settings', meta: { title: '设置' }, component: () => import('./views/Settings.vue') },
       { path: 'security', meta: { title: '安全' }, component: () => import('./views/Security.vue') },
+      { path: ':pathMatch(.*)*', redirect: '/dashboard' },
     ],
   },
 ]
@@ -63,6 +63,7 @@ const agentRoutes: RouteRecordRaw[] = [
       { path: 'subagents', component: () => import('./views/agent/Subagents.vue') },
       { path: 'billing', component: () => import('./views/agent/Billing.vue') },
       { path: 'settings', meta: { title: '设置' }, component: () => import('./views/agent/Settings.vue') },
+      { path: ':pathMatch(.*)*', redirect: '/dashboard' },
     ],
   },
 ]

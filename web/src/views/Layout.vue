@@ -37,7 +37,6 @@ const menu = computed<MenuOption[]>(() => [
     label: '权限与内容',
     children: [
       { label: '权限包', key: '/entitlements' },
-      { label: '策略', key: '/policies' },
       { label: '应用', key: '/apps' },
     ],
   },
