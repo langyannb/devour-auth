@@ -8,16 +8,38 @@ import (
 	"github.com/langyannb/devour-auth/internal/store"
 )
 
-// quickGenerate 发卡页的简化入口：只选时间类型 + 数量。
+// quickReq 发卡页的简化入参。
+//
+// 单码卡密（Multiplier）= 一张卡的时长倍数：周卡 + 2 → 2 周。
+// 卡密数量（Qty）= 生成几张卡，两者互不影响。
 type quickReq struct {
 	Kind        string `json:"kind"` // day|week|month|forever|custom
-	Value       int64  `json:"value"`
-	Unit        string `json:"unit"` // day|hour（custom 用）
+	Multiplier  int64  `json:"multiplier"`
+	Value       int64  `json:"value"` // custom 用
+	Unit        string `json:"unit"`  // minute|hour|day（custom 用）
 	DeviceLimit int64  `json:"device_limit"`
 	Length      int    `json:"length"`
 	Prefix      string `json:"prefix"`
 	Qty         int    `json:"qty"`
 	Note        string `json:"note"`
+}
+
+// baseSeconds 各类型的单码基础时长。
+var baseSeconds = map[string]int64{
+	"day":   86400,
+	"week":  7 * 86400,
+	"month": 30 * 86400,
+}
+
+func unitSeconds(unit string) int64 {
+	switch unit {
+	case "minute":
+		return 60
+	case "hour":
+		return 3600
+	default:
+		return 86400
+	}
 }
 
 func (s *Server) quickGenerate(w http.ResponseWriter, r *http.Request) {
@@ -35,6 +57,13 @@ func (s *Server) quickGenerate(w http.ResponseWriter, r *http.Request) {
 	if req.Length <= 0 {
 		req.Length = card.DefaultKamiLength
 	}
+	if req.Multiplier <= 0 {
+		req.Multiplier = 1
+	}
+	if req.Multiplier > 10000 {
+		writeErr(w, http.StatusBadRequest, CodeBadInput, "单码卡密倍数过大")
+		return
+	}
 
 	app, err := s.appFromQuery(r)
 	if err != nil {
@@ -42,50 +71,30 @@ func (s *Server) quickGenerate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 类型 → 模板策略 + 覆盖时长
 	var (
-		kind      string
-		duration  int64
-		policyRaw store.Policy
+		policyKind string
+		duration   int64
 	)
 	switch req.Kind {
-	case "day":
-		kind, duration = store.KindDuration, 86400
-	case "week":
-		kind, duration = store.KindDuration, 7*86400
-	case "month":
-		kind, duration = store.KindDuration, 30*86400
+	case "day", "week", "month":
+		policyKind = store.KindDuration
+		duration = baseSeconds[req.Kind] * req.Multiplier
 	case "forever":
-		kind, duration = store.KindForever, 0
+		policyKind = store.KindForever
+		duration = 0
 	case "custom":
-		kind = store.KindDuration
+		policyKind = store.KindDuration
 		v := req.Value
 		if v <= 0 {
 			v = 1
 		}
-		if req.Unit == "hour" {
-			duration = v * 3600
-		} else {
-			duration = v * 86400
-		}
-	case "time":
-		// 时间卡：按传进来的 value + unit，默认 1 天
-		kind = store.KindDuration
-		v := req.Value
-		if v <= 0 {
-			v = 1
-		}
-		if req.Unit == "hour" {
-			duration = v * 3600
-		} else {
-			duration = v * 86400
-		}
+		duration = v * unitSeconds(req.Unit) * req.Multiplier
 	default:
-		writeErr(w, http.StatusBadRequest, CodeBadInput, "类型需为 day/week/month/forever/custom/time")
+		writeErr(w, http.StatusBadRequest, CodeBadInput, "类型需为 day/week/month/forever/custom")
 		return
 	}
 
-	policyRaw, err = s.st.EnsureQuickPolicy(ctx, app.ID, kind, s.now().Unix())
+	tpl, err := s.st.EnsureQuickPolicy(ctx, app.ID, policyKind, s.now().Unix())
 	if err != nil {
 		internalErr(w, s.log, "准备模板策略失败", err)
 		return
@@ -94,7 +103,7 @@ func (s *Server) quickGenerate(w http.ResponseWriter, r *http.Request) {
 	c := adminFrom(r)
 	res, err := s.cards.Generate(ctx, card.GenerateReq{
 		AppID:           app.ID,
-		PolicyID:        policyRaw.ID,
+		PolicyID:        tpl.ID,
 		Qty:             req.Qty,
 		Prefix:          req.Prefix,
 		KamiLength:      req.Length,
@@ -110,10 +119,12 @@ func (s *Server) quickGenerate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeData(w, map[string]any{
-		"batch_id": res.BatchID,
-		"kamis":    res.Kamis,
-		"qty":      len(res.Kamis),
-		"kind":     req.Kind,
-		"seconds":  duration,
+		"batch_id":   res.BatchID,
+		"kamis":      res.Kamis,
+		"qty":        len(res.Kamis),
+		"kind":       req.Kind,
+		"seconds":    duration,
+		"per_card":   duration,
+		"multiplier": req.Multiplier,
 	})
 }

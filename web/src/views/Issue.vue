@@ -13,23 +13,25 @@ const kamis = ref<string[]>([])
 const batchId = ref(0)
 const isMobile = useMobile()
 
-// 卡类型：固定时长 + 自定义
+// 卡类型只保留时间类
 const kindOptions = [
-  { label: '天卡（1 天）', value: 'day' },
-  { label: '周卡（7 天）', value: 'week' },
-  { label: '月卡（30 天）', value: 'month' },
+  { label: '天卡（1 天 / 份）', value: 'day' },
+  { label: '周卡（7 天 / 份）', value: 'week' },
+  { label: '月卡（30 天 / 份）', value: 'month' },
   { label: '永久卡', value: 'forever' },
-  { label: '时间卡（自定义天数）', value: 'time' },
-  { label: '自定义时间（天/小时）', value: 'custom' },
+  { label: '自定义时间', value: 'custom' },
 ]
 
+const BASE: Record<string, number> = { day: 86400, week: 7 * 86400, month: 30 * 86400 }
+
 const form = ref({
-  kind: 'day',
-  value: 1,
-  unit: 'day',
+  kind: 'week',
+  multiplier: 1, // 单码卡密：一张卡的时长倍数
+  value: 1, // 自定义时间的数值
+  unit: 'day', // 自定义时间的单位
   length: 32,
   prefix: 'DV',
-  qty: 1,
+  qty: 1, // 卡密数量（生成几张）
   deviceLimit: 1,
   note: '',
 })
@@ -39,8 +41,42 @@ const customText = ref('')
 const policyId = ref<number | null>(null)
 const policies = ref<Array<{ id: number; name: string; code: string }>>([])
 
-const showValue = computed(() => form.value.kind === 'time' || form.value.kind === 'custom')
-const showUnit = computed(() => form.value.kind === 'custom')
+const unitLabel: Record<string, string> = { minute: '分钟', hour: '小时', day: '天' }
+
+// 一张卡的实际时长（秒）
+const perCardSeconds = computed(() => {
+  const f = form.value
+  if (f.kind === 'forever') return 0
+  if (f.kind === 'custom') {
+    const unit = f.unit === 'minute' ? 60 : f.unit === 'hour' ? 3600 : 86400
+    return f.value * unit * f.multiplier
+  }
+  return (BASE[f.kind] ?? 0) * f.multiplier
+})
+
+function human(seconds: number): string {
+  if (seconds <= 0) return '永久'
+  const d = Math.floor(seconds / 86400)
+  const h = Math.floor((seconds % 86400) / 3600)
+  const m = Math.floor((seconds % 3600) / 60)
+  const parts: string[] = []
+  if (d) parts.push(`${d} 天`)
+  if (h) parts.push(`${h} 小时`)
+  if (m) parts.push(`${m} 分钟`)
+  if (parts.length === 0) parts.push(`${seconds} 秒`)
+  return parts.join(' ')
+}
+
+// 单码卡密旁边的人话提示
+const multiplierHint = computed(() => {
+  const f = form.value
+  if (f.kind === 'forever') return '永久卡不受倍数影响'
+  if (f.kind === 'custom') {
+    return `${f.value} ${unitLabel[f.unit]} × ${f.multiplier} = ${human(perCardSeconds.value)}`
+  }
+  const base = f.kind === 'day' ? '天' : f.kind === 'week' ? '周' : '月'
+  return `${f.multiplier} ${base} = ${human(perCardSeconds.value)}`
+})
 
 const customLines = computed(() =>
   customText.value.split('\n').map((s) => s.trim()).filter(Boolean),
@@ -87,6 +123,7 @@ async function generate() {
 
     const d = await api.post<{ batch_id: number; kamis: string[] }>('/admin/api/cards/quick', {
       kind: form.value.kind,
+      multiplier: form.value.multiplier,
       value: form.value.value,
       unit: form.value.unit,
       device_limit: form.value.deviceLimit,
@@ -97,7 +134,7 @@ async function generate() {
     })
     batchId.value = d.batch_id
     kamis.value = d.kamis
-    notice.value = `已生成 ${d.kamis.length} 张`
+    notice.value = `已生成 ${d.kamis.length} 张，每张 ${human(perCardSeconds.value)}`
   } catch (e) {
     err.value = (e as Error).message
   } finally {
@@ -166,29 +203,34 @@ onMounted(loadPolicies)
           <n-select v-model:value="form.kind" :options="kindOptions" />
         </n-form-item>
 
-        <n-form-item v-if="showValue" label="数值">
-          <n-input-number v-model:value="form.value" :min="1" :max="3650" />
+        <n-form-item v-if="form.kind === 'custom'" label="自定义时长">
+          <n-input-number v-model:value="form.value" :min="1" :max="100000" style="width: 140px" />
+          <n-select
+            v-model:value="form.unit"
+            :options="[{ label: '分钟', value: 'minute' }, { label: '小时', value: 'hour' }, { label: '天', value: 'day' }]"
+            style="width: 110px; margin-left: 8px"
+          />
+        </n-form-item>
+
+        <n-form-item label="单码卡密">
+          <n-input-number v-model:value="form.multiplier" :min="1" :max="10000" style="width: 140px" />
           <span style="margin-left: 10px; font-size: 12px; color: #8b93a7">
-            选「时间卡」时单位是天：1 = 1 天
+            {{ multiplierHint }}
           </span>
-        </n-form-item>
-
-        <n-form-item v-if="showUnit" label="单位">
-          <n-select v-model:value="form.unit" :options="[{ label: '天', value: 'day' }, { label: '小时', value: 'hour' }]" style="width: 140px" />
-        </n-form-item>
-
-        <n-form-item label="卡密长度">
-          <n-input-number v-model:value="form.length" :min="4" :max="128" />
-          <span style="margin-left: 10px; font-size: 12px; color: #8b93a7">随机部分长度，默认 32</span>
-        </n-form-item>
-
-        <n-form-item label="卡密前缀">
-          <n-input v-model:value="form.prefix" placeholder="DV" style="width: 160px" />
-          <span style="margin-left: 10px; font-size: 12px; color: #8b93a7">留空则纯随机</span>
         </n-form-item>
 
         <n-form-item label="卡密数量">
           <n-input-number v-model:value="form.qty" :min="1" :max="500" />
+          <span style="margin-left: 10px; font-size: 12px; color: #8b93a7">生成几张卡</span>
+        </n-form-item>
+
+        <n-form-item label="卡密长度">
+          <n-input-number v-model:value="form.length" :min="4" :max="128" />
+          <span style="margin-left: 10px; font-size: 12px; color: #8b93a7">随机部分，默认 32</span>
+        </n-form-item>
+
+        <n-form-item label="卡密前缀">
+          <n-input v-model:value="form.prefix" placeholder="DV" style="width: 160px" />
         </n-form-item>
 
         <n-form-item label="设备绑定数量">
@@ -206,7 +248,7 @@ onMounted(loadPolicies)
     <template v-if="kamis.length">
       <n-space align="center" style="margin: 20px 0 8px" :wrap="true">
         <n-tag type="success">批次 {{ batchId }}</n-tag>
-        <span>共 {{ kamis.length }} 张</span>
+        <span>共 {{ kamis.length }} 张，每张 {{ human(perCardSeconds) }}</span>
         <n-button size="small" @click="copyAll">复制全部</n-button>
       </n-space>
       <div class="kami-box">
