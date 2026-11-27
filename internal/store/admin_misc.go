@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strings"
 )
 
 // ---------- 黑名单 ----------
@@ -126,12 +127,20 @@ func (s *Store) ListEvents(ctx context.Context, cardID int64, kind string, limit
 
 // ---------- 财务 ----------
 
-func (s *Store) ListAllLedger(ctx context.Context, agentID int64, limit, offset int) ([]AgentLedgerRow, int64, error) {
+func (s *Store) ListAllLedger(ctx context.Context, appID, agentID int64, limit, offset int) ([]AgentLedgerRow, int64, error) {
 	where := ""
 	var args []any
+	conds := []string{}
 	if agentID > 0 {
-		where = " WHERE agent_id = ?"
+		conds = append(conds, "agent_id = ?")
 		args = append(args, agentID)
+	}
+	if appID > 0 {
+		conds = append(conds, "agent_id IN (SELECT id FROM agents WHERE app_id = ?)")
+		args = append(args, appID)
+	}
+	if len(conds) > 0 {
+		where = " WHERE " + strings.Join(conds, " AND ")
 	}
 	var total int64
 	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM agent_ledger`+where, args...).Scan(&total); err != nil {
@@ -162,12 +171,20 @@ func (s *Store) ListAllLedger(ctx context.Context, agentID int64, limit, offset 
 	return out, total, rows.Err()
 }
 
-func (s *Store) ListAllBills(ctx context.Context, status string) ([]AgentBill, error) {
+func (s *Store) ListAllBills(ctx context.Context, appID int64, status string) ([]AgentBill, error) {
 	q := `SELECT id, agent_id, month, amount_cents, status, settled_at, COALESCE(note,'') FROM agent_bills`
+	conds := []string{}
 	var args []any
 	if status != "" {
-		q += ` WHERE status = ?`
+		conds = append(conds, "status = ?")
 		args = append(args, status)
+	}
+	if appID > 0 {
+		conds = append(conds, "agent_id IN (SELECT id FROM agents WHERE app_id = ?)")
+		args = append(args, appID)
+	}
+	if len(conds) > 0 {
+		q += " WHERE " + strings.Join(conds, " AND ")
 	}
 	q += ` ORDER BY month DESC, id DESC`
 	rows, err := s.db.QueryContext(ctx, q, args...)

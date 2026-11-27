@@ -41,7 +41,7 @@ func (s *Store) Stats(ctx context.Context, appID, dayStart, now int64) (Stats, e
 	}{
 		{`SELECT COUNT(*) FROM devices d JOIN cards c ON c.id = d.card_id
 		   WHERE d.unbound_at IS NULL AND (? = 0 OR c.app_id = ?)`, []any{appID, appID}, &out.DevicesBound},
-		{`SELECT COUNT(*) FROM agents WHERE status = 'active'`, nil, &out.AgentsActive},
+		{`SELECT COUNT(*) FROM agents WHERE status = 'active' AND (? = 0 OR app_id = ?)`, []any{appID, appID}, &out.AgentsActive},
 		{`SELECT COUNT(*) FROM cards WHERE activated_at >= ? AND (? = 0 OR app_id = ?)`,
 			[]any{dayStart, appID, appID}, &out.ActivationsDay},
 		{`SELECT COUNT(*) FROM sessions se JOIN cards c ON c.id = se.card_id

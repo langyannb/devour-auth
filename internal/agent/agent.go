@@ -208,7 +208,7 @@ func (s *Service) GenerateBills(ctx context.Context, month string) (int, error) 
 	start := t.Unix()
 	end := t.AddDate(0, 1, 0).Unix()
 
-	agents, err := s.st.ListAgents(ctx, 0)
+	agents, err := s.st.ListAgents(ctx, 0, 0)
 	if err != nil {
 		return 0, err
 	}

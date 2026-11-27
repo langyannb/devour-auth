@@ -256,7 +256,7 @@ onMounted(() => {
         免费模式：服务端不校验卡密，/v1/meta 下发 mode: free，客户端自行放行；
         设备/IP 验证只在收费模式下生效。
       </p>
-      <p class="policy-hint">设备验证关闭后不校验设备数量上限；IP 验证开启后换 IP 只记录异常，不拦登录。</p>
+      <p class="policy-hint">设备验证关闭后不校验设备数量上限，同时在线也不限；IP 验证开启后换 IP 只记录异常，不拦登录。</p>
       <n-button type="primary" :loading="policyBusy" @click="savePolicy">保存</n-button>
     </n-card>
 

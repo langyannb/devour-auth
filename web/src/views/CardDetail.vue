@@ -120,7 +120,7 @@ async function toggleVerifyDevice() {
   try {
     const on = card.value?.verify_device === 0 // 当前关着就打开
     await api.patch(`/admin/api/cards/${id}`, { verify_device: on })
-    notice.value = on ? '已开启设备校验' : '已关闭设备校验（不限设备数量）'
+    notice.value = on ? '已开启设备校验' : '已关闭设备校验（不限设备数量与同时在线）'
     await load()
   } catch (e) {
     err.value = (e as Error).message

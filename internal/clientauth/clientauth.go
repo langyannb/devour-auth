@@ -221,13 +221,20 @@ func (s *Service) Login(ctx context.Context, req LoginReq, ip, ua string) (Sessi
 		}
 	}
 
-	// 并发上限：挤掉最旧会话
+	// 并发上限：允许同时在线数 = 设备上限；关掉设备校验则不限。超过上限挤掉最旧的。
+	concurrentLimit := snap.DeviceLimit
+	if concurrentLimit <= 0 {
+		concurrentLimit = 1
+	}
+	if !enforceDevice {
+		concurrentLimit = 0 // 0 = 不限
+	}
 	active, err := s.st.ActiveClientSessionsTx(ctx, tx, row.ID, now.Unix())
 	if err != nil {
 		return SessionView{}, err
 	}
-	if int64(len(active)) >= snap.ConcurrentLimit {
-		drop := int64(len(active)) - snap.ConcurrentLimit + 1
+	if concurrentLimit > 0 && int64(len(active)) >= concurrentLimit {
+		drop := int64(len(active)) - concurrentLimit + 1
 		for i := int64(0); i < drop && i < int64(len(active)); i++ {
 			if err := s.st.RevokeClientSessionTx(ctx, tx, active[i].ID, now.Unix()); err != nil {
 				return SessionView{}, err

@@ -103,7 +103,7 @@ func (s *Server) listEvents(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) listFinanceLedger(w http.ResponseWriter, r *http.Request) {
 	rows, total, err := s.st.ListAllLedger(r.Context(),
-		queryInt64(r, "agent_id"), int(queryInt64(r, "limit")), int(queryInt64(r, "offset")))
+		queryInt64(r, "app_id"), queryInt64(r, "agent_id"), int(queryInt64(r, "limit")), int(queryInt64(r, "offset")))
 	if err != nil {
 		internalErr(w, s.log, "查流水失败", err)
 		return
@@ -119,7 +119,7 @@ func (s *Server) listFinanceLedger(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) listFinanceBills(w http.ResponseWriter, r *http.Request) {
-	bills, err := s.st.ListAllBills(r.Context(), r.URL.Query().Get("status"))
+	bills, err := s.st.ListAllBills(r.Context(), queryInt64(r, "app_id"), r.URL.Query().Get("status"))
 	if err != nil {
 		internalErr(w, s.log, "查账单失败", err)
 		return

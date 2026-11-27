@@ -244,3 +244,49 @@ func TestCardVerifyDeviceOverride(t *testing.T) {
 		t.Fatalf("重新开启后第三台设备应 403，得到 %d", code)
 	}
 }
+
+// 设备上限 > 1 时允许多台同时在线。
+func TestConcurrentOnlineByDeviceLimit(t *testing.T) {
+	e := setup(t)
+	c, csrf := e.login(t, "admin", "8.9.1.1")
+	kami := e.quickCardLimit(t, c, csrf, "8.9.1.1", 2)
+	e.clientLogin(t, kami, "fp-on-1", "8.9.1.1")
+	e.clientLogin(t, kami, "fp-on-2", "8.9.1.1")
+
+	var cardID, n int64
+	if err := e.st.DB().QueryRow(`SELECT id FROM cards WHERE kami = ?`, kami).Scan(&cardID); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.st.DB().QueryRow(`SELECT COUNT(*) FROM sessions WHERE card_id = ? AND revoked_at IS NULL`, cardID).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	if n != 2 {
+		t.Fatalf("两台设备应同时在线，得到 %d", n)
+	}
+}
+
+// 单卡关掉设备校验后，多台设备（超过原上限）可以同时在线。
+func TestNoVerifyAllowsManyOnline(t *testing.T) {
+	e := setup(t)
+	c, csrf := e.login(t, "admin", "8.9.2.1")
+	kami := e.quickCardLimit(t, c, csrf, "8.9.2.1", 1)
+	var cardID int64
+	if err := e.st.DB().QueryRow(`SELECT id FROM cards WHERE kami = ?`, kami).Scan(&cardID); err != nil {
+		t.Fatal(err)
+	}
+	if code, body := e.do(t, c, http.MethodPatch, fmt.Sprintf("/admin/api/cards/%d", cardID), csrf, "8.9.2.1",
+		`{"verify_device":false}`); code != http.StatusOK {
+		t.Fatalf("关设备校验失败: %d %s", code, body)
+	}
+	e.clientLogin(t, kami, "fp-many-1", "8.9.2.1")
+	e.clientLogin(t, kami, "fp-many-2", "8.9.2.1")
+	e.clientLogin(t, kami, "fp-many-3", "8.9.2.1")
+
+	var n int64
+	if err := e.st.DB().QueryRow(`SELECT COUNT(*) FROM sessions WHERE card_id = ? AND revoked_at IS NULL`, cardID).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	if n != 3 {
+		t.Fatalf("应三台同时在线，得到 %d", n)
+	}
+}

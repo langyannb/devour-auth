@@ -12,6 +12,7 @@ import (
 // 存放在 secret_hash 列（仅创建时返回给调用方一次）。design.md 第 13 节已同步修正。
 type APIKey struct {
 	ID        int64
+	AppID     int64
 	Name      string
 	Scopes    string
 	KeyID     string
@@ -23,9 +24,9 @@ type APIKey struct {
 
 func (s *Store) CreateAPIKey(ctx context.Context, k APIKey) (int64, error) {
 	res, err := s.db.ExecContext(ctx,
-		`INSERT INTO api_keys(name, scopes, key_id, secret_hash, status, created_at)
-		 VALUES(?,?,?,?,?,?)`,
-		k.Name, k.Scopes, k.KeyID, k.Secret, k.Status, k.CreatedAt)
+		`INSERT INTO api_keys(app_id, name, scopes, key_id, secret_hash, status, created_at)
+		 VALUES(?,?,?,?,?,?,?)`,
+		k.AppID, k.Name, k.Scopes, k.KeyID, k.Secret, k.Status, k.CreatedAt)
 	if err != nil {
 		return 0, err
 	}
@@ -35,19 +36,19 @@ func (s *Store) CreateAPIKey(ctx context.Context, k APIKey) (int64, error) {
 func (s *Store) APIKeyByKeyID(ctx context.Context, keyID string) (APIKey, error) {
 	var k APIKey
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, name, scopes, key_id, secret_hash, last_used, status, created_at
+		`SELECT id, app_id, name, scopes, key_id, secret_hash, last_used, status, created_at
 		   FROM api_keys WHERE key_id = ?`, keyID).
-		Scan(&k.ID, &k.Name, &k.Scopes, &k.KeyID, &k.Secret, &k.LastUsed, &k.Status, &k.CreatedAt)
+		Scan(&k.ID, &k.AppID, &k.Name, &k.Scopes, &k.KeyID, &k.Secret, &k.LastUsed, &k.Status, &k.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return APIKey{}, ErrNotFound
 	}
 	return k, err
 }
 
-func (s *Store) ListAPIKeys(ctx context.Context) ([]APIKey, error) {
+func (s *Store) ListAPIKeys(ctx context.Context, appID int64) ([]APIKey, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, name, scopes, key_id, secret_hash, last_used, status, created_at
-		   FROM api_keys ORDER BY id DESC`)
+		`SELECT id, app_id, name, scopes, key_id, secret_hash, last_used, status, created_at
+		   FROM api_keys WHERE app_id = ? ORDER BY id DESC`, appID)
 	if err != nil {
 		return nil, err
 	}
@@ -55,7 +56,7 @@ func (s *Store) ListAPIKeys(ctx context.Context) ([]APIKey, error) {
 	var out []APIKey
 	for rows.Next() {
 		var k APIKey
-		if err := rows.Scan(&k.ID, &k.Name, &k.Scopes, &k.KeyID, &k.Secret, &k.LastUsed, &k.Status, &k.CreatedAt); err != nil {
+		if err := rows.Scan(&k.ID, &k.AppID, &k.Name, &k.Scopes, &k.KeyID, &k.Secret, &k.LastUsed, &k.Status, &k.CreatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, k)
@@ -78,5 +79,14 @@ func (s *Store) ActiveSessionCount(ctx context.Context, now int64) (int64, error
 	var n int64
 	err := s.db.QueryRowContext(ctx,
 		`SELECT COUNT(*) FROM sessions WHERE revoked_at IS NULL AND refresh_exp > ?`, now).Scan(&n)
+	return n, err
+}
+
+// ActiveSessionCountApp 指定应用的在线会话数。
+func (s *Store) ActiveSessionCountApp(ctx context.Context, now, appID int64) (int64, error) {
+	var n int64
+	err := s.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM sessions se JOIN cards c ON c.id = se.card_id
+		  WHERE se.revoked_at IS NULL AND se.refresh_exp > ? AND c.app_id = ?`, now, appID).Scan(&n)
 	return n, err
 }
