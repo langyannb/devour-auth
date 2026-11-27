@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"crypto/ed25519"
 	"io/fs"
 	"log/slog"
 	"net/http"
@@ -14,28 +15,30 @@ import (
 )
 
 type Server struct {
-	st      *store.Store
-	cards   *card.Service
-	clients *clientauth.Service
-	agents  *agent.Service
-	static  fs.FS
-	log     *slog.Logger
-	env     string
-	lim     *auth.Limiter
-	now     func() time.Time
+	st        *store.Store
+	cards     *card.Service
+	clients   *clientauth.Service
+	agents    *agent.Service
+	static    fs.FS
+	ticketKey ed25519.PrivateKey
+	log       *slog.Logger
+	env       string
+	lim       *auth.Limiter
+	now       func() time.Time
 }
 
-func New(st *store.Store, log *slog.Logger, env string, static fs.FS) *Server {
+func New(st *store.Store, log *slog.Logger, env string, static fs.FS, ticketKey ed25519.PrivateKey) *Server {
 	return &Server{
-		st:      st,
-		cards:   card.New(st),
-		clients: clientauth.New(st),
-		agents:  agent.New(st),
-		static:  static,
-		log:     log,
-		env:     env,
-		lim:     auth.NewLimiter(),
-		now:     time.Now,
+		st:        st,
+		cards:     card.New(st),
+		clients:   clientauth.New(st),
+		agents:    agent.New(st),
+		static:    static,
+		ticketKey: ticketKey,
+		log:       log,
+		env:       env,
+		lim:       auth.NewLimiter(),
+		now:       time.Now,
 	}
 }
 
@@ -94,6 +97,20 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /agent/api/cards", s.requireAgent(s.agentCards))
 	mux.HandleFunc("GET /agent/api/ledger", s.requireAgent(s.agentLedger))
 	mux.HandleFunc("GET /agent/api/bills", s.requireAgent(s.agentBills))
+
+	// 运营内容
+	mux.HandleFunc("GET /admin/api/releases", s.requireAdmin(s.listReleases))
+	mux.HandleFunc("POST /admin/api/releases", s.requireAdmin(s.createRelease))
+	mux.HandleFunc("POST /admin/api/releases/{id}/toggle", s.requireAdmin(s.toggleRelease))
+	mux.HandleFunc("GET /admin/api/notices", s.requireAdmin(s.listNoticesAdmin))
+	mux.HandleFunc("POST /admin/api/notices", s.requireAdmin(s.createNotice))
+	mux.HandleFunc("POST /admin/api/notices/{id}/toggle", s.requireAdmin(s.toggleNotice))
+	mux.HandleFunc("GET /admin/api/flags", s.requireAdmin(s.listFlagsAdmin))
+	mux.HandleFunc("PUT /admin/api/flags", s.requireAdmin(s.setFlag))
+
+	// 客户端元信息与离线票据
+	mux.HandleFunc("GET /v1/meta", s.meta)
+	mux.HandleFunc("POST /v1/offline-ticket", s.offlineTicket)
 
 	// 客户端协议（design.md 第 12 节）
 	mux.HandleFunc("POST /v1/auth/login", s.clientLogin)

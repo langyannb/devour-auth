@@ -726,6 +726,31 @@ func (s *Service) effectiveEntitlements(ctx context.Context, tx *sql.Tx, row sto
 	return s.st.EntitlementsByCodesTx(ctx, tx, row.AppID, codes)
 }
 
+// TicketData 取离线票据所需的数据：卡、设备指纹、快照与生效权限。
+func (s *Service) TicketData(ctx context.Context, accessToken string) (store.Card, card.Snapshot, string, []store.Entitlement, error) {
+	now := s.now()
+	tx, err := s.st.DB().BeginTx(ctx, nil)
+	if err != nil {
+		return store.Card{}, card.Snapshot{}, "", nil, err
+	}
+	defer tx.Rollback()
+
+	sess, row, err := s.sessionCardTx(ctx, tx, accessToken, now.Unix())
+	if err != nil {
+		return store.Card{}, card.Snapshot{}, "", nil, err
+	}
+	dev, err := s.st.DeviceByIDTx(ctx, tx, sess.DeviceID)
+	if err != nil {
+		return store.Card{}, card.Snapshot{}, "", nil, err
+	}
+	snap := SnapshotOf(row)
+	ents, err := s.effectiveEntitlements(ctx, tx, row, snap, now.Unix())
+	if err != nil {
+		return store.Card{}, card.Snapshot{}, "", nil, err
+	}
+	return row, snap, dev.Fingerprint, ents, nil
+}
+
 // ---------- 工具 ----------
 
 // SnapshotOf 解析出卡时冻结的快照；解析失败一律按空快照处理，不阻断登录。

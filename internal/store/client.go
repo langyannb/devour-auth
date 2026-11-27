@@ -67,6 +67,24 @@ func (s *Store) TouchDeviceTx(ctx context.Context, tx *sql.Tx, id, now int64) er
 	return err
 }
 
+func (s *Store) DeviceByID(ctx context.Context, id int64) (Device, error) {
+	d, err := scanDevice(s.db.QueryRowContext(ctx,
+		`SELECT `+deviceCols+` FROM devices WHERE id = ?`, id))
+	if errors.Is(err, sql.ErrNoRows) {
+		return Device{}, ErrNotFound
+	}
+	return d, err
+}
+
+func (s *Store) DeviceByIDTx(ctx context.Context, tx *sql.Tx, id int64) (Device, error) {
+	d, err := scanDevice(tx.QueryRowContext(ctx,
+		`SELECT `+deviceCols+` FROM devices WHERE id = ?`, id))
+	if errors.Is(err, sql.ErrNoRows) {
+		return Device{}, ErrNotFound
+	}
+	return d, err
+}
+
 // ---------- 客户端会话 ----------
 
 type ClientSession struct {

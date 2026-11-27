@@ -88,7 +88,7 @@ func run() error {
 
 	srv := &http.Server{
 		Addr:              cfg.ListenAddr,
-		Handler:           httpapi.New(st, log, cfg.Env, webui.FS()).Handler(),
+		Handler:           httpapi.New(st, log, cfg.Env, webui.FS(), priv).Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
 		IdleTimeout:       60 * time.Second,
 	}

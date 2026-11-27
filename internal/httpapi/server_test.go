@@ -2,6 +2,8 @@ package httpapi_test
 
 import (
 	"context"
+	"crypto/ed25519"
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -48,9 +50,16 @@ func setup(t *testing.T) env {
 	if _, err := st.CreateAdmin(ctx, "op", hash, "operator", "", 1000); err != nil {
 		t.Fatal(err)
 	}
+	if _, err := st.EnsureApp(ctx, "devour", "Devour", 1000); err != nil {
+		t.Fatal(err)
+	}
 
+	_, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
 	srv := httpapi.New(st, slog.New(slog.NewTextHandler(io.Discard, nil)), "dev",
-		fstest.MapFS{"index.html": &fstest.MapFile{Data: []byte("<!doctype html><title>test</title>")}})
+		fstest.MapFS{"index.html": &fstest.MapFile{Data: []byte("<!doctype html><title>test</title>")}}, priv)
 	ts := httptest.NewServer(srv.Handler())
 	t.Cleanup(ts.Close)
 	return env{ts: ts, st: st}
