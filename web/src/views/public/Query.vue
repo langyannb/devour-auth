@@ -56,9 +56,10 @@ async function loadCaptcha() {
   try {
     const res = await fetch('/v1/query/captcha')
     const body = await res.json()
-    if (body.id && body.image) {
-      captchaId.value = body.id
-      captchaImg.value = body.image
+    const d = body.data
+    if (d?.id && d?.image) {
+      captchaId.value = d.id
+      captchaImg.value = d.image
     }
   } catch {
     // 拉取失败时保持旧图，查询会提示验证码错误
@@ -278,8 +279,8 @@ h1 {
   min-width: 120px;
 }
 .captcha-img {
-  height: 40px;
-  width: 120px;
+  height: 50px;
+  width: 160px;
   object-fit: cover;
   border-radius: 6px;
   cursor: pointer;
