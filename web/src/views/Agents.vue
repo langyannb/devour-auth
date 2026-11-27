@@ -28,7 +28,10 @@ const notice = ref('')
 const loading = ref(false)
 
 const showCreate = ref(false)
-const createForm = ref({ name: '', password: '', quotaYuan: 0 })
+const createForm = ref({ name: '', password: '', quotaYuan: 0, parentId: null as number | null })
+const parentOptions = computed(() =>
+  rows.value.filter((a) => a.level === 1).map((a) => ({ label: `${a.name}（L1）`, value: a.id })),
+)
 const busy = ref(false)
 
 const quotaDlg = ref<{ agent: Agent; mode: 'add' | 'sub' } | null>(null)
@@ -97,10 +100,11 @@ async function create() {
       name: createForm.value.name,
       password: createForm.value.password,
       monthly_quota_cents: Math.round(createForm.value.quotaYuan * 100),
+      parent_id: createForm.value.parentId ?? 0,
     })
     notice.value = `已创建代理 ${createForm.value.name}`
     showCreate.value = false
-    createForm.value = { name: '', password: '', quotaYuan: 0 }
+    createForm.value = { name: '', password: '', quotaYuan: 0, parentId: null }
     await load()
   } catch (e) {
     err.value = (e as Error).message
@@ -177,6 +181,9 @@ onMounted(load)
         <n-form-item label="初始额度（元）">
           <n-input-number v-model:value="createForm.quotaYuan" :min="-1" />
           <span style="margin-left: 10px; font-size: 12px; color: #8b93a7">0 = 不能出卡，-1 = 不限</span>
+        </n-form-item>
+        <n-form-item label="上级代理（不选则是一级）">
+          <n-select v-model:value="createForm.parentId" :options="parentOptions" clearable placeholder="一级代理" />
         </n-form-item>
         <n-button type="primary" :loading="busy" block @click="create">创建</n-button>
       </n-form>

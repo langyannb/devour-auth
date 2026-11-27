@@ -116,8 +116,13 @@ async function loadApps() {
 }
 
 function switchApp(v: string) {
+  if (!v || v === appId.value) return
   setCurrentApp(v)
   location.reload()
+}
+
+function onAppChange(e: Event) {
+  switchApp((e.target as HTMLSelectElement).value)
 }
 
 onMounted(loadApps)
@@ -138,13 +143,9 @@ onMounted(loadApps)
     </n-layout-sider>
     <n-layout>
       <n-layout-header bordered style="height: 52px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 20px">
-        <n-select
-          v-model:value="appId"
-          :options="apps.map(a => ({ label: `${a.name}（${a.code}）`, value: String(a.id) }))"
-          size="small"
-          style="width: 200px"
-          @update:value="switchApp"
-        />
+        <select class="app-select" :value="appId" @change="onAppChange">
+          <option v-for="a in apps" :key="a.id" :value="String(a.id)">{{ a.name }}（{{ a.code }}）</option>
+        </select>
         <span style="display:flex;align-items:center;gap:12px">
         <span style="color: #666">{{ user }}</span>
         <n-button size="small" @click="logout">退出</n-button>
@@ -162,13 +163,9 @@ onMounted(loadApps)
       <n-button text style="font-size: 20px; line-height: 1" @click="drawer = true">☰</n-button>
       <span style="font-weight: 600">Devour Auth</span>
       <span style="flex: 1"></span>
-      <n-select
-        v-model:value="appId"
-        :options="apps.map(a => ({ label: a.name, value: String(a.id) }))"
-        size="tiny"
-        style="width: 110px"
-        @update:value="switchApp"
-      />
+      <select class="app-select mobile" :value="appId" @change="onAppChange">
+        <option v-for="a in apps" :key="a.id" :value="String(a.id)">{{ a.name }}</option>
+      </select>
       <n-button text size="small" @click="logout">退出</n-button>
     </header>
     <main style="flex: 1; padding: 12px; overflow-x: auto">
@@ -179,6 +176,22 @@ onMounted(loadApps)
 </template>
 
 <style scoped>
+.app-select {
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid #dcdfe6;
+  border-radius: 4px;
+  background: #fff;
+  color: #333;
+  font-size: 13px;
+  max-width: 220px;
+}
+.app-select.mobile {
+  height: 28px;
+  font-size: 12px;
+  max-width: 120px;
+  padding: 0 4px;
+}
 :deep(.n-menu-item-group-title) {
   color: #8b93a7;
   font-size: 12px;

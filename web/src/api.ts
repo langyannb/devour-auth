@@ -2,8 +2,9 @@ import { ref } from 'vue'
 
 export const authed = ref(false)
 
-// 当前管理端上下文的应用（多应用切换）
-let currentApp = sessionStorage.getItem('devour_app') ?? ''
+// 当前管理端上下文的应用（多应用切换）。放 localStorage：刷新、换标签页都保持一致。
+let currentApp = localStorage.getItem('devour_app') ?? sessionStorage.getItem('devour_app') ?? ''
+if (currentApp && !localStorage.getItem('devour_app')) localStorage.setItem('devour_app', currentApp)
 
 export function getCurrentApp(): string {
   return currentApp
@@ -11,7 +12,7 @@ export function getCurrentApp(): string {
 
 export function setCurrentApp(id: string) {
   currentApp = id
-  sessionStorage.setItem('devour_app', id)
+  localStorage.setItem('devour_app', id)
 }
 export const agentAuthed = ref(false)
 
@@ -121,6 +122,8 @@ export const agentApi = {
   get: <T>(path: string) => request<T>(path, {}, 'agent'),
   post: <T>(path: string, body?: unknown) =>
     request<T>(path, { method: 'POST', body: body === undefined ? undefined : JSON.stringify(body) }, 'agent'),
+  put: <T>(path: string, body?: unknown) =>
+    request<T>(path, { method: 'PUT', body: body === undefined ? undefined : JSON.stringify(body) }, 'agent'),
 }
 
 export async function tryRestore(): Promise<boolean> {
