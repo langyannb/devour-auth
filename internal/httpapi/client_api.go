@@ -2,11 +2,13 @@ package httpapi
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/langyannb/devour-auth/internal/apierr"
+	"github.com/langyannb/devour-auth/internal/audit"
 	"github.com/langyannb/devour-auth/internal/clientauth"
 )
 
@@ -120,6 +122,169 @@ func (s *Server) clientLogout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeData(w, map[string]any{"logged_out": true})
+}
+
+// ---------- 消耗与暂停 ----------
+
+func (s *Server) clientConsume(w http.ResponseWriter, r *http.Request) {
+	tok := bearer(r)
+	if tok == "" {
+		writeErr(w, http.StatusUnauthorized, CodeUnauthorized, "缺少访问令牌")
+		return
+	}
+	var req struct {
+		EntitlementCode string `json:"entitlement_code"`
+		Nonce           string `json:"nonce"`
+	}
+	if !decode(w, r, &req) {
+		return
+	}
+	res, err := s.clients.Consume(r.Context(), tok, req.EntitlementCode, req.Nonce,
+		clientIP(r), truncate(r.UserAgent(), 200))
+	if err != nil {
+		s.writeAPIError(w, err)
+		return
+	}
+	writeData(w, res)
+}
+
+func (s *Server) clientPause(w http.ResponseWriter, r *http.Request) {
+	tok := bearer(r)
+	if tok == "" {
+		writeErr(w, http.StatusUnauthorized, CodeUnauthorized, "缺少访问令牌")
+		return
+	}
+	var req struct {
+		Paused bool `json:"paused"`
+	}
+	if !decode(w, r, &req) {
+		return
+	}
+	res, err := s.clients.Pause(r.Context(), tok, req.Paused,
+		clientIP(r), truncate(r.UserAgent(), 200))
+	if err != nil {
+		s.writeAPIError(w, err)
+		return
+	}
+	writeData(w, res)
+}
+
+// ---------- 单卡权限（管理端） ----------
+
+type cardEntReq struct {
+	Code      string `json:"code"`
+	ExpiresAt int64  `json:"expires_at"`
+}
+
+func (s *Server) grantCardEntitlement(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(r)
+	if !ok {
+		writeErr(w, http.StatusBadRequest, CodeBadInput, "id 不合法")
+		return
+	}
+	var req cardEntReq
+	if !decode(w, r, &req) {
+		return
+	}
+	if req.Code == "" {
+		writeErr(w, http.StatusBadRequest, CodeBadInput, "缺少 code")
+		return
+	}
+	ctx := r.Context()
+	tx, err := s.st.DB().BeginTx(ctx, nil)
+	if err != nil {
+		internalErr(w, s.log, "事务失败", err)
+		return
+	}
+	defer tx.Rollback()
+
+	cardRow, err := s.st.CardTx(ctx, tx, id)
+	if err != nil {
+		writeErr(w, http.StatusNotFound, CodeBadInput, "卡不存在")
+		return
+	}
+	ent, err := s.st.EntitlementByCodeTx(ctx, tx, cardRow.AppID, req.Code)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, CodeBadInput, "权限不存在")
+		return
+	}
+	c := adminFrom(r)
+	if err := s.st.GrantCardEntitlementTx(ctx, tx, id, ent.ID, c.Admin.ID, req.ExpiresAt); err != nil {
+		internalErr(w, s.log, "附加权限失败", err)
+		return
+	}
+	if err := audit.Append(ctx, tx, audit.Entry{
+		TS:     s.now().Unix(),
+		Actor:  fmt.Sprintf("%s:%d", c.Admin.Role, c.Admin.ID),
+		Action: "card.entitlement_grant",
+		Target: fmt.Sprintf("card:%d", id),
+		After:  fmt.Sprintf(`{"code":%q,"expires_at":%d}`, req.Code, req.ExpiresAt),
+		IP:     clientIP(r),
+	}); err != nil {
+		internalErr(w, s.log, "写审计失败", err)
+		return
+	}
+	if err := tx.Commit(); err != nil {
+		internalErr(w, s.log, "提交失败", err)
+		return
+	}
+	writeData(w, map[string]any{"card_id": id, "code": req.Code, "granted": true})
+}
+
+func (s *Server) revokeCardEntitlement(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(r)
+	if !ok {
+		writeErr(w, http.StatusBadRequest, CodeBadInput, "id 不合法")
+		return
+	}
+	var req cardEntReq
+	if !decode(w, r, &req) {
+		return
+	}
+	if req.Code == "" {
+		writeErr(w, http.StatusBadRequest, CodeBadInput, "缺少 code")
+		return
+	}
+	ctx := r.Context()
+	tx, err := s.st.DB().BeginTx(ctx, nil)
+	if err != nil {
+		internalErr(w, s.log, "事务失败", err)
+		return
+	}
+	defer tx.Rollback()
+
+	cardRow, err := s.st.CardTx(ctx, tx, id)
+	if err != nil {
+		writeErr(w, http.StatusNotFound, CodeBadInput, "卡不存在")
+		return
+	}
+	ent, err := s.st.EntitlementByCodeTx(ctx, tx, cardRow.AppID, req.Code)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, CodeBadInput, "权限不存在")
+		return
+	}
+	c := adminFrom(r)
+	if err := s.st.RevokeCardEntitlementTx(ctx, tx, id, ent.ID, c.Admin.ID, s.now().Unix()); err != nil {
+		internalErr(w, s.log, "撤销权限失败", err)
+		return
+	}
+	if err := audit.Append(ctx, tx, audit.Entry{
+		TS:     s.now().Unix(),
+		Actor:  fmt.Sprintf("%s:%d", c.Admin.Role, c.Admin.ID),
+		Action: "card.entitlement_revoke",
+		Target: fmt.Sprintf("card:%d", id),
+		Before: fmt.Sprintf(`{"code":%q}`, req.Code),
+		After:  fmt.Sprintf(`{"code":%q,"revoked":true}`, req.Code),
+		IP:     clientIP(r),
+	}); err != nil {
+		internalErr(w, s.log, "写审计失败", err)
+		return
+	}
+	if err := tx.Commit(); err != nil {
+		internalErr(w, s.log, "提交失败", err)
+		return
+	}
+	writeData(w, map[string]any{"card_id": id, "code": req.Code, "revoked": true})
 }
 
 func (s *Server) clientSession(w http.ResponseWriter, r *http.Request) {

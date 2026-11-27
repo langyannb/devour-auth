@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -362,5 +364,200 @@ func TestBannedCardRejected(t *testing.T) {
 	_, err := h.login(kami, "fp-1")
 	if err == nil || codeOf(t, err) != apierr.CardBanned {
 		t.Fatalf("封禁卡应拒绝: %v", err)
+	}
+}
+
+// 验收项 2：10 个并发 consume 扣 500 点，最终不为负。
+func TestConcurrentConsumeNeverNegative(t *testing.T) {
+	ctx := context.Background()
+	h := setup(t)
+	p := h.makePolicy(t, store.Policy{Code: "credit", Name: "credit", Kind: store.KindCredit,
+		InitialPoints: 500, DeviceLimit: 5, ConcurrentLimit: 5})
+	entID, err := h.st.CreateEntitlement(ctx, store.Entitlement{
+		AppID: h.appID, Code: "aim", Name: "aim", CostPoints: 100, Active: 1, CreatedAt: 1000,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := h.st.SetPolicyEntitlements(ctx, p.ID, []int64{entID}); err != nil {
+		t.Fatal(err)
+	}
+	kami := h.issue(t, p.ID)
+
+	view, err := h.login(kami, "fp-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(view.Entitlements) != 1 || view.Entitlements[0].Code != "aim" || view.Entitlements[0].CostPoints != 100 {
+		t.Fatalf("权限下发不对: %+v", view.Entitlements)
+	}
+
+	const n = 10
+	var (
+		wg      sync.WaitGroup
+		okCount atomic.Int64
+		badErrs atomic.Int64
+	)
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			_, err := h.svc.Consume(ctx, view.AccessToken, "aim",
+				fmt.Sprintf("nonce-concurrent-%02d-0123456789", i), "1.2.3.4", "ua")
+			if err == nil {
+				okCount.Add(1)
+				return
+			}
+			if codeOfQuiet(err) != apierr.CardExhausted {
+				badErrs.Add(1)
+			}
+		}(i)
+	}
+	wg.Wait()
+
+	if badErrs.Load() != 0 {
+		t.Fatalf("%d 次失败不是 CARD_EXHAUSTED", badErrs.Load())
+	}
+	if okCount.Load() != 5 {
+		t.Fatalf("成功次数 = %d want 5", okCount.Load())
+	}
+	c, _ := h.st.CardByKami(ctx, kami)
+	if c.Points != 0 {
+		t.Fatalf("points = %d want 0", c.Points)
+	}
+	if c.Status != store.CardExhausted {
+		t.Fatalf("状态 = %s want exhausted", c.Status)
+	}
+	// 再消费一次必须失败
+	if _, err := h.svc.Consume(ctx, view.AccessToken, "aim", "nonce-after-0123456789", "1.2.3.4", "ua"); err == nil {
+		t.Fatal("点数耗尽后应拒绝")
+	}
+}
+
+func codeOfQuiet(err error) string {
+	var ae *apierr.Error
+	if errors.As(err, &ae) {
+		return ae.Code
+	}
+	return ""
+}
+
+// consume 的 nonce 幂等：重复请求返回上次结果，不重复扣。
+func TestConsumeNonceIdempotent(t *testing.T) {
+	ctx := context.Background()
+	h := setup(t)
+	p := h.makePolicy(t, store.Policy{Code: "credit", Name: "credit", Kind: store.KindCredit,
+		InitialPoints: 100, DeviceLimit: 3})
+	entID, _ := h.st.CreateEntitlement(ctx, store.Entitlement{
+		AppID: h.appID, Code: "aim", Name: "aim", CostPoints: 30, Active: 1, CreatedAt: 1000,
+	})
+	_ = h.st.SetPolicyEntitlements(ctx, p.ID, []int64{entID})
+	kami := h.issue(t, p.ID)
+	view, err := h.login(kami, "fp-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	nonce := "nonce-idem-0123456789abcdef"
+	first, err := h.svc.Consume(ctx, view.AccessToken, "aim", nonce, "ip", "ua")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.BalanceAfter != 70 || first.Replayed {
+		t.Fatalf("第一次: balance=%d replayed=%v", first.BalanceAfter, first.Replayed)
+	}
+	second, err := h.svc.Consume(ctx, view.AccessToken, "aim", nonce, "ip", "ua")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !second.Replayed || second.BalanceAfter != 70 {
+		t.Fatalf("重放应返回上次结果: %+v", second)
+	}
+	c, _ := h.st.CardByKami(ctx, kami)
+	if c.Points != 70 {
+		t.Fatalf("重放不应重复扣: points = %d", c.Points)
+	}
+}
+
+// 验收项 4：同一权限「附加 + 撤销」，撤销生效。
+func TestEntitlementGrantRevoke(t *testing.T) {
+	ctx := context.Background()
+	h := setup(t)
+	p := h.makePolicy(t, store.Policy{Code: "credit", Name: "credit", Kind: store.KindCredit,
+		InitialPoints: 100, DeviceLimit: 3})
+	basicID, _ := h.st.CreateEntitlement(ctx, store.Entitlement{
+		AppID: h.appID, Code: "basic", Name: "basic", Active: 1, CreatedAt: 1000,
+	})
+	aimID, _ := h.st.CreateEntitlement(ctx, store.Entitlement{
+		AppID: h.appID, Code: "aim", Name: "aim", CostPoints: 10, Active: 1, CreatedAt: 1000,
+	})
+	_ = h.st.SetPolicyEntitlements(ctx, p.ID, []int64{basicID})
+	kami := h.issue(t, p.ID)
+	c, _ := h.st.CardByKami(ctx, kami)
+
+	// 附加 aim，撤销 basic
+	tx, _ := h.st.DB().BeginTx(ctx, nil)
+	if err := h.st.GrantCardEntitlementTx(ctx, tx, c.ID, aimID, 1, 0); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.st.RevokeCardEntitlementTx(ctx, tx, c.ID, basicID, 1, h.now.Unix()); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+
+	view, err := h.login(kami, "fp-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	codes := map[string]bool{}
+	for _, e := range view.Entitlements {
+		codes[e.Code] = true
+	}
+	if codes["basic"] {
+		t.Fatal("撤销的权限不应下发")
+	}
+	if !codes["aim"] {
+		t.Fatal("附加的权限应下发")
+	}
+	// 撤销的权限不能消费
+	if _, err := h.svc.Consume(ctx, view.AccessToken, "basic", "nonce-basic-0123456789ab", "ip", "ua"); err == nil ||
+		codeOfQuiet(err) != apierr.EntitlementMissing {
+		t.Fatalf("撤销的权限应 ENTITLEMENT_MISSING: %v", err)
+	}
+}
+
+func TestPauseAPI(t *testing.T) {
+	ctx := context.Background()
+	h := setup(t)
+	p := h.makePolicy(t, store.Policy{Code: "timed", Name: "timed", Kind: store.KindTimed,
+		DurationHours: 1, HeartbeatSec: 600})
+	kami := h.issue(t, p.ID)
+	view, err := h.login(kami, "fp-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = h.svc.Pause(ctx, view.AccessToken, true, "ip", "ua")
+	if err != nil {
+		t.Fatalf("暂停: %v", err)
+	}
+	_, err = h.svc.Status(ctx, view.AccessToken, "ip", "ua")
+	if err == nil || codeOfQuiet(err) != apierr.Paused {
+		t.Fatalf("暂停后心跳应 PAUSED: %v", err)
+	}
+	if _, err := h.svc.Pause(ctx, view.AccessToken, false, "ip", "ua"); err != nil {
+		t.Fatalf("恢复: %v", err)
+	}
+	if _, err := h.svc.Status(ctx, view.AccessToken, "ip", "ua"); err != nil {
+		t.Fatalf("恢复后心跳应正常: %v", err)
+	}
+
+	// 非计时卡不能暂停
+	p2 := h.makePolicy(t, store.Policy{Code: "forever", Name: "forever", Kind: store.KindForever})
+	k2 := h.issue(t, p2.ID)
+	v2, _ := h.login(k2, "fp-2")
+	if _, err := h.svc.Pause(ctx, v2.AccessToken, true, "ip", "ua"); err == nil {
+		t.Fatal("非计时卡暂停应报错")
 	}
 }

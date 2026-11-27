@@ -61,6 +61,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /admin/api/cards/{id}/unbind", s.requireAdmin(s.cardStatusAction("unbind", s.cards.Unbind)))
 	mux.HandleFunc("POST /admin/api/cards/{id}/reset-rebind", s.requireAdmin(s.cardStatusAction("reset_rebind", s.cards.ResetRebind)))
 	mux.HandleFunc("POST /admin/api/cards/{id}/extend", s.requireAdmin(s.extendCard))
+	mux.HandleFunc("POST /admin/api/cards/{id}/entitlements/grant", s.requireAdmin(s.grantCardEntitlement))
+	mux.HandleFunc("POST /admin/api/cards/{id}/entitlements/revoke", s.requireAdmin(s.revokeCardEntitlement))
 
 	// 审计
 	mux.HandleFunc("GET /admin/api/audit", s.requireAdmin(s.listAudit))
@@ -70,6 +72,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /v1/auth/refresh", s.clientRefresh)
 	mux.HandleFunc("POST /v1/auth/logout", s.clientLogout)
 	mux.HandleFunc("GET /v1/session", s.clientSession)
+	mux.HandleFunc("POST /v1/consume", s.clientConsume)
+	mux.HandleFunc("POST /v1/pause", s.clientPause)
 
 	// 未匹配路径也走统一错误体（JSON 端点，不返回 HTML）。
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {

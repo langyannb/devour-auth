@@ -6,6 +6,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"sort"
 	"sync"
 	"time"
 
@@ -239,7 +241,7 @@ func (s *Service) Login(ctx context.Context, req LoginReq, ip, ua string) (Sessi
 		return SessionView{}, err
 	}
 
-	ents, err := s.st.EntitlementsByCodesTx(ctx, tx, row.AppID, snap.Entitlements)
+	ents, err := s.effectiveEntitlements(ctx, tx, row, snap, now.Unix())
 	if err != nil {
 		return SessionView{}, err
 	}
@@ -343,7 +345,7 @@ func (s *Service) Status(ctx context.Context, accessToken, ip, ua string) (Sessi
 		}
 	}
 
-	ents, err := s.st.EntitlementsByCodesTx(ctx, tx, row.AppID, snap.Entitlements)
+	ents, err := s.effectiveEntitlements(ctx, tx, row, snap, now.Unix())
 	if err != nil {
 		return SessionView{}, err
 	}
@@ -451,7 +453,7 @@ func (s *Service) Refresh(ctx context.Context, refreshToken, ip, ua string) (Ses
 	}
 
 	snap := SnapshotOf(row)
-	ents, err := s.st.EntitlementsByCodesTx(ctx, tx, row.AppID, snap.Entitlements)
+	ents, err := s.effectiveEntitlements(ctx, tx, row, snap, now.Unix())
 	if err != nil {
 		return SessionView{}, err
 	}
@@ -497,6 +499,231 @@ func (s *Service) Logout(ctx context.Context, accessToken string) error {
 		return err
 	}
 	return tx.Commit()
+}
+
+// ---------- 消耗 ----------
+
+type ConsumeResult struct {
+	Code            string `json:"code"`
+	BalanceAfter    int64  `json:"balance_after"`
+	CostPoints      int64  `json:"cost_points"`
+	CostTimes       int64  `json:"cost_times"`
+	RemainingPoints int64  `json:"remaining_points"`
+	RemainingTimes  int64  `json:"remaining_times"`
+	Replayed        bool   `json:"replayed"`
+	ServerTime      int64  `json:"server_time"`
+}
+
+// Consume 按权限定义扣点/扣次，nonce 全局幂等（design.md 第 8、12 节）。
+func (s *Service) Consume(ctx context.Context, accessToken, code, nonce, ip, ua string) (ConsumeResult, error) {
+	now := s.now()
+	if code == "" || nonce == "" || len(nonce) < 16 {
+		return ConsumeResult{}, apierr.New(apierr.BadInput, "entitlement_code / nonce 缺失")
+	}
+
+	tx, err := s.st.DB().BeginTx(ctx, nil)
+	if err != nil {
+		return ConsumeResult{}, err
+	}
+	defer tx.Rollback()
+
+	sess, row, err := s.sessionCardTx(ctx, tx, accessToken, now.Unix())
+	if err != nil {
+		return ConsumeResult{}, err
+	}
+	_ = sess
+
+	// 幂等：同一 nonce 重放返回上次结果
+	if u, err := s.st.UsageByNonceTx(ctx, tx, nonce); err == nil {
+		if u.CardID != row.ID {
+			return ConsumeResult{}, apierr.New(apierr.BadInput, "nonce 已被其他卡使用")
+		}
+		return ConsumeResult{
+			Code: u.Code, BalanceAfter: u.BalanceAfter,
+			CostPoints: u.CostPoints, CostTimes: u.CostTimes,
+			RemainingPoints: row.Points, RemainingTimes: row.RemainTimes,
+			Replayed: true, ServerTime: now.Unix(),
+		}, nil
+	} else if !errors.Is(err, store.ErrNotFound) {
+		return ConsumeResult{}, err
+	}
+
+	snap := SnapshotOf(row)
+	eff, err := s.effectiveEntitlements(ctx, tx, row, snap, now.Unix())
+	if err != nil {
+		return ConsumeResult{}, err
+	}
+	var ent store.Entitlement
+	found := false
+	for _, e := range eff {
+		if e.Code == code {
+			ent, found = e, true
+			break
+		}
+	}
+	if !found {
+		return ConsumeResult{}, apierr.New(apierr.EntitlementMissing, "没有该权限")
+	}
+
+	balance := row.Points
+	if ent.CostTimes > 0 {
+		balance = row.RemainTimes
+	}
+	if ent.CostPoints > 0 {
+		bal, ok, err := s.st.DeductPointsTx(ctx, tx, row.ID, ent.CostPoints)
+		if err != nil {
+			return ConsumeResult{}, err
+		}
+		if !ok {
+			return ConsumeResult{}, apierr.New(apierr.CardExhausted, "点数不足")
+		}
+		row.Points, balance = bal, bal
+	}
+	if ent.CostTimes > 0 {
+		bal, ok, err := s.st.DeductTimesTx(ctx, tx, row.ID, ent.CostTimes)
+		if err != nil {
+			return ConsumeResult{}, err
+		}
+		if !ok {
+			return ConsumeResult{}, apierr.New(apierr.CardExhausted, "次数不足")
+		}
+		row.RemainTimes, balance = bal, bal
+	}
+
+	if (row.Kind == store.KindCredit && row.Points == 0) ||
+		(row.Kind == store.KindCount && row.RemainTimes == 0) {
+		row.Status = store.CardExhausted
+		if err := s.st.UpdateCardTx(ctx, tx, row); err != nil {
+			return ConsumeResult{}, err
+		}
+	}
+
+	if err := s.st.InsertUsageTx(ctx, tx, store.Usage{
+		CardID: row.ID, Code: code,
+		CostPoints: ent.CostPoints, CostTimes: ent.CostTimes,
+		BalanceAfter: balance, Nonce: nonce, CreatedAt: now.Unix(),
+	}); err != nil {
+		if errors.Is(err, store.ErrConflict) {
+			return ConsumeResult{}, apierr.New(apierr.BadInput, "nonce 冲突")
+		}
+		return ConsumeResult{}, err
+	}
+	if err := s.st.InsertEventTx(ctx, tx, store.Event{
+		TS: now.Unix(), Kind: "consume", CardID: row.ID, IP: ip, UA: ua, Code: code,
+	}); err != nil {
+		return ConsumeResult{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return ConsumeResult{}, err
+	}
+	return ConsumeResult{
+		Code: code, BalanceAfter: balance,
+		CostPoints: ent.CostPoints, CostTimes: ent.CostTimes,
+		RemainingPoints: row.Points, RemainingTimes: row.RemainTimes,
+		ServerTime: now.Unix(),
+	}, nil
+}
+
+// ---------- 暂停 ----------
+
+func (s *Service) Pause(ctx context.Context, accessToken string, paused bool, ip, ua string) (SessionView, error) {
+	now := s.now()
+	tx, err := s.st.DB().BeginTx(ctx, nil)
+	if err != nil {
+		return SessionView{}, err
+	}
+	defer tx.Rollback()
+
+	_, row, err := s.sessionCardTx(ctx, tx, accessToken, now.Unix())
+	if err != nil {
+		return SessionView{}, err
+	}
+	if row.Kind != store.KindTimed {
+		return SessionView{}, apierr.New(apierr.BadInput, "仅计时卡支持暂停")
+	}
+	if err := s.st.SetCardPausedTx(ctx, tx, row.ID, paused); err != nil {
+		return SessionView{}, err
+	}
+	if paused {
+		row.Paused = 1
+	} else {
+		row.Paused = 0
+	}
+
+	snap := SnapshotOf(row)
+	ents, err := s.effectiveEntitlements(ctx, tx, row, snap, now.Unix())
+	if err != nil {
+		return SessionView{}, err
+	}
+	bound, err := s.st.CountBoundDevicesTx(ctx, tx, row.ID)
+	if err != nil {
+		return SessionView{}, err
+	}
+	if err := s.st.InsertEventTx(ctx, tx, store.Event{
+		TS: now.Unix(), Kind: "pause", CardID: row.ID, IP: ip, UA: ua,
+		Detail: fmt.Sprintf("%t", paused),
+	}); err != nil {
+		return SessionView{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return SessionView{}, err
+	}
+	return SessionView{
+		Card:         viewOf(row, snap.DeviceLimit, bound),
+		Entitlements: entViews(ents),
+		ServerTime:   now.Unix(),
+	}, nil
+}
+
+// sessionCardTx 从 access token 取会话与卡，并做吊销/过期/可用性检查。
+func (s *Service) sessionCardTx(ctx context.Context, tx *sql.Tx, accessToken string, now int64) (store.ClientSession, store.Card, error) {
+	sess, err := s.st.ClientSessionByAccessHashTx(ctx, tx, auth.HashToken(accessToken))
+	if errors.Is(err, store.ErrNotFound) {
+		return store.ClientSession{}, store.Card{}, apierr.New(apierr.Unauthorized, "令牌无效")
+	} else if err != nil {
+		return store.ClientSession{}, store.Card{}, err
+	}
+	if sess.RevokedAt.Valid {
+		return store.ClientSession{}, store.Card{}, apierr.New(apierr.Revoked, "会话已吊销")
+	}
+	if sess.AccessExp <= now || sess.RefreshExp <= now {
+		return store.ClientSession{}, store.Card{}, apierr.New(apierr.Unauthorized, "令牌已过期")
+	}
+	row, err := s.st.CardTx(ctx, tx, sess.CardID)
+	if err != nil {
+		return store.ClientSession{}, store.Card{}, err
+	}
+	if err := checkUsable(row, now); err != nil {
+		return store.ClientSession{}, store.Card{}, err
+	}
+	return sess, row, nil
+}
+
+// effectiveEntitlements 生效权限 = 卡类型权限 ∪ 单卡附加 − 单卡撤销，撤销优先。
+func (s *Service) effectiveEntitlements(ctx context.Context, tx *sql.Tx, row store.Card, snap card.Snapshot, now int64) ([]store.Entitlement, error) {
+	eff := make(map[string]bool, len(snap.Entitlements))
+	for _, c := range snap.Entitlements {
+		eff[c] = true
+	}
+	overrides, err := s.st.CardEntitlementRowsTx(ctx, tx, row.ID)
+	if err != nil {
+		return nil, err
+	}
+	for _, o := range overrides {
+		if o.Revoked {
+			delete(eff, o.Code)
+			continue
+		}
+		if o.ExpiresAt == 0 || o.ExpiresAt > now {
+			eff[o.Code] = true
+		}
+	}
+	codes := make([]string, 0, len(eff))
+	for c := range eff {
+		codes = append(codes, c)
+	}
+	sort.Strings(codes)
+	return s.st.EntitlementsByCodesTx(ctx, tx, row.AppID, codes)
 }
 
 // ---------- 工具 ----------
