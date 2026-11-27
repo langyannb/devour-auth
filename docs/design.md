@@ -486,7 +486,7 @@ BEGIN SELECT RAISE(ABORT, 'audit_log is append-only'); END;
   查卡返回 5 分钟有效的 `unbind_ticket`，解绑时校验，不必再输一次验证码。
 - 卡密验证模式：`card_mode=paid|free`。`free` 时服务端不校验卡密，只在 `/v1/meta`
   下发 `mode: "free"`，由客户端自行放行；设备/IP 开关只在收费模式有意义。
-- 解绑策略由管理员在设置页配置（应用开关 `flags`）：
+- 解绑策略由管理员在「运营」页配置（应用开关 `flags`）：
   `unbind_free` 免费次数、`unbind_cooldown_days` 冷却天数、
   `unbind_mode`（reject=超出拒绝 / charge=扣时，与卡密验证模式无关）、`unbind_cost_hours` 每次扣的小时数。
   未配置时回退到卡快照里的旧字段；扣时只对时长卡生效，永久卡超出即拒绝。

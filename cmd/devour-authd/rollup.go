@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/langyannb/devour-auth/internal/config"
+	"github.com/langyannb/devour-auth/internal/money"
 	"github.com/langyannb/devour-auth/internal/store"
 )
 
@@ -33,7 +34,7 @@ func runRollup(cfg config.Config, day string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("%s：登录 %d 次、激活 %d 张、独立设备 %d 台、出卡金额 %d 分\n",
-		day, stat.Logins, stat.Activations, stat.UniqueDevices, stat.IssuedCents)
+	fmt.Printf("%s：登录 %d 次、激活 %d 张、独立设备 %d 台、出卡金额 %s 元\n",
+		day, stat.Logins, stat.Activations, stat.UniqueDevices, money.Yuan(stat.IssuedCents))
 	return nil
 }

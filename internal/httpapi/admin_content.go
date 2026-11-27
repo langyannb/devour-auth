@@ -100,6 +100,11 @@ func (s *Server) toggleRelease(w http.ResponseWriter, r *http.Request) {
 
 // updateRelease 编辑已发布的版本（版本号/说明/地址/灰度/强更）。
 func (s *Server) updateRelease(w http.ResponseWriter, r *http.Request) {
+	app, err := s.appFromQuery(r)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, CodeBadInput, "应用不存在")
+		return
+	}
 	id, ok := pathID(r)
 	if !ok {
 		writeErr(w, http.StatusBadRequest, CodeBadInput, "id 不合法")
@@ -117,7 +122,7 @@ func (s *Server) updateRelease(w http.ResponseWriter, r *http.Request) {
 	if rollout <= 0 || rollout > 10000 {
 		rollout = 10000
 	}
-	hit, err := s.st.UpdateRelease(r.Context(), id, store.Release{
+	hit, err := s.st.UpdateRelease(r.Context(), app.ID, id, store.Release{
 		Version: req.Version, Info: req.Info, URL: req.URL,
 		Must: boolInt(req.Must), RolloutBP: rollout,
 	})
@@ -138,12 +143,17 @@ func (s *Server) updateRelease(w http.ResponseWriter, r *http.Request) {
 
 // deleteRelease 删除版本记录。
 func (s *Server) deleteRelease(w http.ResponseWriter, r *http.Request) {
+	app, err := s.appFromQuery(r)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, CodeBadInput, "应用不存在")
+		return
+	}
 	id, ok := pathID(r)
 	if !ok {
 		writeErr(w, http.StatusBadRequest, CodeBadInput, "id 不合法")
 		return
 	}
-	hit, err := s.st.DeleteRelease(r.Context(), id)
+	hit, err := s.st.DeleteRelease(r.Context(), app.ID, id)
 	if err != nil {
 		internalErr(w, s.log, "删除版本失败", err)
 		return
@@ -247,6 +257,11 @@ func (s *Server) toggleNotice(w http.ResponseWriter, r *http.Request) {
 
 // updateNotice 编辑公告（类型/标题/正文）。
 func (s *Server) updateNotice(w http.ResponseWriter, r *http.Request) {
+	app, err := s.appFromQuery(r)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, CodeBadInput, "应用不存在")
+		return
+	}
 	id, ok := pathID(r)
 	if !ok {
 		writeErr(w, http.StatusBadRequest, CodeBadInput, "id 不合法")
@@ -266,7 +281,7 @@ func (s *Server) updateNotice(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, CodeBadInput, "kind 需为 list/popup/immediate")
 		return
 	}
-	hit, err := s.st.UpdateNotice(r.Context(), id, store.Notice{
+	hit, err := s.st.UpdateNotice(r.Context(), app.ID, id, store.Notice{
 		Kind: req.Kind, Title: req.Title, Body: req.Body,
 	})
 	if err != nil {
@@ -286,12 +301,17 @@ func (s *Server) updateNotice(w http.ResponseWriter, r *http.Request) {
 
 // deleteNotice 删除公告。
 func (s *Server) deleteNotice(w http.ResponseWriter, r *http.Request) {
+	app, err := s.appFromQuery(r)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, CodeBadInput, "应用不存在")
+		return
+	}
 	id, ok := pathID(r)
 	if !ok {
 		writeErr(w, http.StatusBadRequest, CodeBadInput, "id 不合法")
 		return
 	}
-	hit, err := s.st.DeleteNotice(r.Context(), id)
+	hit, err := s.st.DeleteNotice(r.Context(), app.ID, id)
 	if err != nil {
 		internalErr(w, s.log, "删除公告失败", err)
 		return

@@ -176,23 +176,6 @@ func (s *Server) resolveEntitlements(ctx context.Context, appID int64, codes []s
 	return ids, nil
 }
 
-func (s *Server) listPolicies(w http.ResponseWriter, r *http.Request) {
-	appID := queryInt64(r, "app_id")
-	policies, err := s.st.ListPolicies(r.Context(), appID)
-	if err != nil {
-		internalErr(w, s.log, "查卡类型失败", err)
-		return
-	}
-	out := make([]map[string]any, 0, len(policies))
-	for _, p := range policies {
-		if isInternalPolicy(p.Code) {
-			continue
-		}
-		out = append(out, policyJSON(p))
-	}
-	writeData(w, out)
-}
-
 func (s *Server) createPolicy(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	var req policyReq

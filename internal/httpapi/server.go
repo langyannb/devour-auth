@@ -115,7 +115,6 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /admin/api/apps", s.requireAdmin(s.listApps))
 	mux.HandleFunc("POST /admin/api/apps", s.requireAdmin(s.requireRole("admin", s.createApp)))
 	mux.HandleFunc("PATCH /admin/api/apps/{id}", s.requireAdmin(s.requireRole("admin", s.updateApp)))
-	mux.HandleFunc("GET /admin/api/policies", s.requireAdmin(s.listPolicies))
 	mux.HandleFunc("POST /admin/api/policies", s.requireAdmin(s.requireRole("admin", s.requireReauth(s.createPolicy))))
 	mux.HandleFunc("PATCH /admin/api/policies/{id}", s.requireAdmin(s.requireRole("admin", s.requireReauth(s.updatePolicy))))
 	mux.HandleFunc("GET /admin/api/entitlements", s.requireAdmin(s.listEntitlements))
