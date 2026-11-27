@@ -11,6 +11,7 @@ const drawer = ref(false)
 const who = sessionStorage.getItem('devour_agent_name') ?? ''
 
 const menu = computed<MenuOption[]>(() => [
+  { label: '概览', key: '/dashboard' },
   { label: '我的卡密', key: '/cards' },
   { label: '出卡', key: '/issue' },
   { label: '下级', key: '/subagents' },

@@ -23,6 +23,7 @@ const pageSize = 20
 const kami = ref('')
 const loading = ref(false)
 const err = ref('')
+const notice = ref('')
 
 const statusType = (s: string) => {
   switch (s) {
@@ -61,7 +62,35 @@ const columns = computed<DataTableColumns<Card>>(() => [
   },
   { title: '到期', key: 'expire_at', width: 150, render: (r) => (r.expire_at ? formatTs(r.expire_at) : '永久') },
   { title: '创建', key: 'created_at', width: 150, render: (r) => formatTs(r.created_at) },
+  {
+    title: '操作',
+    key: 'op',
+    width: 140,
+    render: (r) =>
+      h(NSpace, { size: 4 }, {
+        default: () => [
+          h(NButton, {
+            size: 'tiny',
+            type: r.status === 'banned' ? 'success' : 'error',
+            onClick: () => act(r, r.status === 'banned' ? 'unban' : 'ban'),
+          }, { default: () => (r.status === 'banned' ? '解封' : '封禁') }),
+          h(NButton, { size: 'tiny', onClick: () => act(r, 'unbind') }, { default: () => '解绑' }),
+        ],
+      }),
+  },
 ])
+
+async function act(r: Card, action: string) {
+  err.value = ''
+  notice.value = ''
+  try {
+    await agentApi.post(`/agent/api/cards/${r.id}/${action}`)
+    notice.value = '操作成功'
+    await load()
+  } catch (e) {
+    err.value = (e as Error).message
+  }
+}
 
 async function load() {
   loading.value = true
@@ -94,7 +123,8 @@ onMounted(load)
       <n-button type="primary" @click="search">查询</n-button>
     </n-space>
     <n-alert v-if="err" type="error" style="margin-bottom: 12px">{{ err }}</n-alert>
-    <n-data-table :columns="columns" :data="rows" :loading="loading" :bordered="false" size="small" :scroll-x="900" />
+    <n-alert v-if="notice" type="success" style="margin-bottom: 12px">{{ notice }}</n-alert>
+    <n-data-table :columns="columns" :data="rows" :loading="loading" :bordered="false" size="small" :scroll-x="1040" />
     <n-space justify="end" style="margin-top: 16px">
       <n-pagination v-model:page="page" :page-size="pageSize" :item-count="total" @update:page="load" />
     </n-space>

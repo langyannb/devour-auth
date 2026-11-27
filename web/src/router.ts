@@ -46,7 +46,8 @@ const agentRoutes: RouteRecordRaw[] = [
     path: '/',
     component: () => import('./views/agent/Layout.vue'),
     children: [
-      { path: '', redirect: '/cards' },
+      { path: '', redirect: '/dashboard' },
+      { path: 'dashboard', component: () => import('./views/agent/Dashboard.vue') },
       { path: 'cards', component: () => import('./views/agent/Cards.vue') },
       { path: 'issue', component: () => import('./views/agent/Issue.vue') },
       { path: 'subagents', component: () => import('./views/agent/Subagents.vue') },
