@@ -113,3 +113,31 @@ func (s *Server) agentInviteActivate(w http.ResponseWriter, r *http.Request) {
 		"server_time": s.now().Unix(),
 	})
 }
+
+// ensureAgentLink 给还没有 slug 的代理补一个专属链接（老数据或管理员手动补）。
+func (s *Server) ensureAgentLink(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(r)
+	if !ok {
+		writeErr(w, http.StatusBadRequest, CodeBadInput, "id 不合法")
+		return
+	}
+	ctx := r.Context()
+	a, err := s.st.AgentByID(ctx, id)
+	if err != nil {
+		writeErr(w, http.StatusNotFound, CodeBadInput, "代理不存在")
+		return
+	}
+	slug := a.LoginSlug
+	if slug == "" {
+		slug, err = newAgentSlug()
+		if err != nil {
+			internalErr(w, s.log, "生成链接失败", err)
+			return
+		}
+		if err := s.st.SetAgentLoginSlug(ctx, id, slug); err != nil {
+			internalErr(w, s.log, "保存链接失败", err)
+			return
+		}
+	}
+	writeData(w, map[string]any{"id": id, "login_link": s.agentInviteLink(slug)})
+}

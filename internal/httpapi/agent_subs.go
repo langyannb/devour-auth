@@ -248,6 +248,31 @@ func (s *Server) agentSubPerms(w http.ResponseWriter, r *http.Request) {
 	writeData(w, map[string]any{"id": sub.ID, "updated": true})
 }
 
+// agentSubLink 给下级补/取专属登录链接（老数据没有 slug）。
+func (s *Server) agentSubLink(w http.ResponseWriter, r *http.Request) {
+	_, sub, ok := s.subAgent(w, r)
+	if !ok {
+		return
+	}
+	slug := sub.LoginSlug
+	if slug == "" {
+		var err error
+		slug, err = newAgentSlug()
+		if err != nil {
+			internalErr(w, s.log, "生成链接失败", err)
+			return
+		}
+		if err := s.st.SetAgentLoginSlug(r.Context(), sub.ID, slug); err != nil {
+			internalErr(w, s.log, "保存链接失败", err)
+			return
+		}
+	}
+	writeData(w, map[string]any{
+		"id": sub.ID, "login_link": s.agentInviteLink(slug),
+		"activated": sub.PasswordSet == 1,
+	})
+}
+
 // resetAgentPassword 管理员重置代理密码。
 func (s *Server) resetAgentPassword(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(r)

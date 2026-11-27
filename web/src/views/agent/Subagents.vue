@@ -5,6 +5,7 @@ import {
   NSelect, NSpace, NSwitch, NTag, type DataTableColumns,
 } from 'naive-ui'
 import { agentApi } from '../../api'
+import { useMobile } from '../../useMobile'
 import { copyText, formatYuan } from '../../utils'
 
 interface Perms {
@@ -36,6 +37,7 @@ const err = ref('')
 const notice = ref('')
 const loading = ref(false)
 const busy = ref(false)
+const isMobile = useMobile()
 
 const showCreate = ref(false)
 const form = ref({ name: '', password: '' })
@@ -136,8 +138,19 @@ async function createSub() {
 }
 
 async function showLink(r: Sub) {
-  if (!r.login_link) return
-  linkDlg.value = { name: r.name, link: r.login_link }
+  err.value = ''
+  let link = r.login_link
+  if (!link) {
+    try {
+      const d = await agentApi.post<{ login_link: string }>(`/agent/api/subagents/${r.id}/link`)
+      link = d.login_link
+      await load()
+    } catch (e) {
+      err.value = (e as Error).message
+      return
+    }
+  }
+  linkDlg.value = { name: r.name, link }
 }
 
 async function copyLink() {
@@ -248,7 +261,33 @@ onMounted(load)
     <n-alert v-if="err" type="error" style="margin-bottom: 12px">{{ err }}</n-alert>
     <n-alert v-if="notice" type="success" style="margin-bottom: 12px">{{ notice }}</n-alert>
 
-    <n-data-table :columns="columns" :data="rows" :loading="loading" :bordered="false" size="small" :scroll-x="720" />
+    <template v-if="isMobile">
+      <n-card v-for="r in rows" :key="r.id" size="small" style="margin-bottom: 10px">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          <b>{{ r.name }}</b>
+          <n-tag v-if="r.is_self" size="tiny" type="info">我</n-tag>
+          <n-tag v-if="r.level === 2" size="tiny">下级</n-tag>
+          <n-tag v-if="!r.is_self && r.activated === false" size="tiny" type="warning">待激活</n-tag>
+          <n-tag size="tiny" :type="r.status === 'active' ? 'success' : 'error'">
+            {{ r.status === 'active' ? '正常' : '冻结' }}
+          </n-tag>
+        </div>
+        <div style="font-size:13px;color:#666;margin:8px 0">
+          额度 {{ r.quota_cents < 0 ? '不限' : formatYuan(r.quota_cents) + ' 元' }} ·
+          模板 {{ r.plan_name ?? '未设置' }}
+        </div>
+        <n-space v-if="!r.is_self" :wrap="true">
+          <n-button size="tiny" @click="showLink(r)">登录链接</n-button>
+          <n-button size="tiny" type="primary" @click="openQuota(r)">划额度</n-button>
+          <n-button size="tiny" @click="openPlan(r)">设模板</n-button>
+          <n-button size="tiny" @click="openPerms(r)">设权限</n-button>
+          <n-button size="tiny" :type="r.status === 'active' ? 'error' : 'success'" @click="toggle(r)">
+            {{ r.status === 'active' ? '冻结' : '解冻' }}
+          </n-button>
+        </n-space>
+      </n-card>
+    </template>
+    <n-data-table v-else :columns="columns" :data="rows" :loading="loading" :bordered="false" size="small" :scroll-x="720" />
 
     <n-modal v-model:show="showCreate" preset="card" title="开通下级" style="width: 420px">
       <n-form label-placement="top">
@@ -270,7 +309,8 @@ onMounted(load)
         <p style="margin-top: 0; font-size: 13px; color: #666">
           把这个链接发给「{{ linkDlg.name }}」，他打开后设置密码就能登录代理端。
         </p>
-        <n-input :value="linkDlg.link" readonly />
+        <a :href="linkDlg.link" target="_blank" rel="noopener" style="word-break: break-all">{{ linkDlg.link }}</a>
+        <n-input :value="linkDlg.link" readonly style="margin-top: 8px" />
       </template>
       <n-space justify="end" style="margin-top: 16px">
         <n-button @click="linkDlg = null">关闭</n-button>

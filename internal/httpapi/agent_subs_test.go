@@ -163,3 +163,41 @@ func TestSubAgentInviteLink(t *testing.T) {
 func jsonUnmarshal(s string, v any) error {
 	return json.NewDecoder(strings.NewReader(s)).Decode(v)
 }
+
+// 老下级没有 slug 时，点「登录链接」能补一个，并且可以正常打开。
+func TestSubAgentEnsureLink(t *testing.T) {
+	e := setup(t)
+	c, csrf := e.login(t, "admin", "5.3.1.1")
+	if code, body := e.do(t, c, http.MethodPost, "/admin/api/agents?app_id=1", csrf, "5.3.1.1",
+		`{"name":"old-top","password":"agent-pass-123456","monthly_quota_cents":1000}`); code != http.StatusOK {
+		t.Fatalf("建代理失败: %d %s", code, body)
+	}
+	var topID int64
+	_ = e.st.DB().QueryRow(`SELECT id FROM agents WHERE name='old-top'`).Scan(&topID)
+	if code, body := e.do(t, c, http.MethodPost, "/admin/api/agents?app_id=1", csrf, "5.3.1.1",
+		fmt.Sprintf(`{"name":"old-sub","password":"sub-pass-123456","parent_id":%d}`, topID)); code != http.StatusOK {
+		t.Fatalf("建下级失败: %d %s", code, body)
+	}
+	var subID int64
+	_ = e.st.DB().QueryRow(`SELECT id FROM agents WHERE name='old-sub'`).Scan(&subID)
+	// 模拟老数据：没有 slug
+	if _, err := e.st.DB().Exec(`UPDATE agents SET login_slug = NULL WHERE id = ?`, subID); err != nil {
+		t.Fatal(err)
+	}
+
+	ac, acsrf := e.loginAgentWithPassword(t, "old-top", "agent-pass-123456")
+	code, body := e.do(t, ac, http.MethodPost, fmt.Sprintf("/agent/api/subagents/%d/link", subID), acsrf, "", "")
+	if code != http.StatusOK || !strings.Contains(body, "login_link") {
+		t.Fatalf("补链接失败: %d %s", code, body)
+	}
+	var slug string
+	_ = e.st.DB().QueryRow(`SELECT login_slug FROM agents WHERE id=?`, subID).Scan(&slug)
+	if slug == "" {
+		t.Fatal("slug 未写入")
+	}
+	// 再点一次返回同一个链接
+	_, body2 := e.do(t, ac, http.MethodPost, fmt.Sprintf("/agent/api/subagents/%d/link", subID), acsrf, "", "")
+	if !strings.Contains(body2, slug) {
+		t.Fatalf("应返回同一个链接: %s", body2)
+	}
+}

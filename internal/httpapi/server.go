@@ -182,6 +182,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /admin/api/agents/{id}/bills", s.requireAdmin(s.agentBillsAdmin))
 	mux.HandleFunc("POST /admin/api/agents/{id}/quota", s.requireAdmin(s.agentQuotaTopup))
 	mux.HandleFunc("POST /admin/api/agents/{id}/reset-password", s.requireAdmin(s.requireReauth(s.resetAgentPassword)))
+	mux.HandleFunc("POST /admin/api/agents/{id}/link", s.requireAdmin(s.ensureAgentLink))
 	mux.HandleFunc("POST /admin/api/bills/{billId}/settle", s.requireAdmin(s.settleBill))
 
 	// 代理端（独立会话域）
@@ -209,6 +210,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /agent/api/subagents/{id}/freeze", s.requireAgent(s.agentSubFrozen(true)))
 	mux.HandleFunc("POST /agent/api/subagents/{id}/unfreeze", s.requireAgent(s.agentSubFrozen(false)))
 	mux.HandleFunc("PUT /agent/api/subagents/{id}/perms", s.requireAgent(s.agentSubPerms))
+	mux.HandleFunc("POST /agent/api/subagents/{id}/link", s.requireAgent(s.agentSubLink))
 	mux.HandleFunc("POST /agent/api/password", s.requireAgent(s.agentChangePassword))
 	mux.HandleFunc("GET /agent/api/ledger/export", s.requireAgent(s.agentBillsExport))
 

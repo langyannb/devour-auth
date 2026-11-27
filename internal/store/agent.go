@@ -358,3 +358,9 @@ func (s *Store) ActivateAgentBySlug(ctx context.Context, slug, passHash string) 
 	}
 	return nil
 }
+
+// SetAgentLoginSlug 写专属链接标识。
+func (s *Store) SetAgentLoginSlug(ctx context.Context, id int64, slug string) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE agents SET login_slug = ? WHERE id = ?`, slug, id)
+	return err
+}
