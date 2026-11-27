@@ -33,3 +33,6 @@ dist/
 
 # 日志
 *.log
+
+# 索引产物
+.codebase-memory/

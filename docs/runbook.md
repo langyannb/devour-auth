@@ -15,11 +15,22 @@
 | 静态前端 | 已 embed 进二进制，无独立目录 |
 | 运行用户 | `devour`（无登录 shell） |
 
-首次部署前确认：
+首次部署前确认（2026-11-27 实测）：
+
+| 项 | 结果 |
+|---|---|
+| 架构 | `x86_64`，交叉编译目标 amd64 |
+| 80 / 443 | 已被 nginx 占用，上有 7 个站点；certbot 走 webroot，不能用 standalone |
+| 6760 | 空闲 |
+| certbot | 已安装；`/etc/letsencrypt/live` 下无 `net.namikao.com`，证书待申请 |
+| Go 运行时 | 未安装，服务器只接收交叉编译好的二进制 |
+
+复核命令：
 
 ```bash
-uname -m                      # amd64 / arm64，决定交叉编译目标
-ss -lntp | grep -E ':(80|443|6760)'   # 80/443 是否被现有站点占用
+uname -m
+ss -lntp | grep -E ':(80|443|6760)'
+certbot certificates
 ```
 
 ## 2. 首次部署

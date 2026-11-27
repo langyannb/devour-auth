@@ -718,6 +718,4 @@ Vue 3 + TypeScript + Vite + Naive UI + Pinia + ECharts，构建产物 embed 进 
 
 ## 21. 待定
 
-- 43.248.187.94 的 CPU 架构（amd64 / arm64），影响部署产物。
-- 80 端口是否被现有站点占用，影响 certbot。
 - 代理额度默认值。
