@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/langyannb/devour-auth/internal/audit"
 	"github.com/langyannb/devour-auth/internal/config"
 	"github.com/langyannb/devour-auth/internal/httpapi"
 	"github.com/langyannb/devour-auth/internal/store"
@@ -31,8 +32,10 @@ func main() {
 		err = runInitAdmin(config.Load())
 	case "verify-audit":
 		err = runVerifyAudit(config.Load())
+	case "anchor":
+		err = runAnchor(config.Load())
 	default:
-		fmt.Fprintf(os.Stderr, "用法: %s [serve|init-admin|verify-audit]\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "用法: %s [serve|init-admin|verify-audit|anchor]\n", os.Args[0])
 		os.Exit(2)
 	}
 
@@ -67,6 +70,12 @@ func run() error {
 	if _, err := st.EnsureApp(ctx, "devour", "Devour", time.Now().Unix()); err != nil {
 		return err
 	}
+
+	priv, err := audit.LoadOrCreateKey(cfg.AuditKeyPath)
+	if err != nil {
+		return err
+	}
+	startAnchoring(ctx, st.DB(), priv, log)
 
 	srv := &http.Server{
 		Addr:              cfg.ListenAddr,

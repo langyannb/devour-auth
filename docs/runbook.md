@@ -239,10 +239,13 @@ systemctl start devour-authd
 
 ## 6. 审计链
 
-- 每日 00:05 自动对当日链尾签名，写入 `audit_anchor`。
-- 后台「系统 / 审计日志」有「校验」按钮，重算整链。
+- 进程内每天 00:05 对链尾签名写入 `audit_anchor`；`devour-authd anchor` 可手动补锚（幂等）。
+- 私钥默认 `data/audit_ed25519.key`，生产用 `DEVOUR_AUDIT_KEY` 指到
+  `/etc/devour-authd/offline-ed25519.key`（0600，首次启动自动生成，不入库不入仓库）。
+- 校验：`DEVOUR_DB=... DEVOUR_AUDIT_KEY=... devour-authd verify-audit`
+  （重算整链 + 校验每个锚点签名与其指向的链尾记录）。
 - 断链处理：立即导出当前 audit_log 与 anchor，停止写入，排查是谁有写权限。
-- 私钥 `/etc/devour-authd/offline-ed25519.key` 单独备份，泄露即轮换。
+- 私钥单独备份，泄露即轮换。
 
 ## 7. 密钥轮换
 
