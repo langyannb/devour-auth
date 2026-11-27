@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { NAlert, NButton, NCard, NRadioButton, NRadioGroup } from 'naive-ui'
 import BarList from '../components/charts/BarList.vue'
+import StatStrip from '../components/StatStrip.vue'
 import DonutChart from '../components/charts/DonutChart.vue'
 import ProvinceMap from '../components/charts/ProvinceMap.vue'
 import TrendChart from '../components/charts/TrendChart.vue'
@@ -116,6 +117,22 @@ const geoTop = computed(() =>
     .map((g) => ({ label: g.province, value: g.logins, hint: `${g.ips} 个 IP`, color: '#06b6d4' })),
 )
 
+const stats = computed(() => [
+  {
+    k: '卡密总数',
+    v: data.value?.cards_total ?? '—',
+    sub: `在线 ${data.value?.online_sessions ?? 0} · 设备 ${data.value?.devices_bound ?? 0}`,
+  },
+  { k: `${days.value} 天代理出卡金额`, v: periodMoney.value, sub: '仅代理出的卡计入' },
+  { k: `${days.value} 天激活`, v: periodActivations.value, sub: `今日 ${data.value?.activations_day ?? 0} 张` },
+  {
+    k: `${days.value} 天活跃设备`,
+    v: data.value?.active_devices ?? '—',
+    sub: `其中已绑定 ${data.value?.devices_bound ?? 0} 台`,
+  },
+  { k: '活跃代理', v: data.value?.agents_active ?? '—', sub: '平台 + 代理出卡' },
+])
+
 const hasTraffic = computed(() => periodLogins.value + periodActivations.value > 0)
 const hasMoney = computed(() => series.value.some((t) => t.issued_cents > 0))
 
@@ -137,33 +154,7 @@ onMounted(load)
       <n-button size="small" :loading="loading" @click="load">刷新</n-button>
     </div>
 
-    <div class="stats">
-      <div class="stat">
-        <span class="k">卡密总数</span>
-        <span class="v">{{ data?.cards_total ?? '—' }}</span>
-        <span class="sub">在线 {{ data?.online_sessions ?? 0 }} · 设备 {{ data?.devices_bound ?? 0 }}</span>
-      </div>
-      <div class="stat">
-        <span class="k">{{ days }} 天代理出卡金额</span>
-        <span class="v">{{ periodMoney }}</span>
-        <span class="sub">仅代理出的卡计入</span>
-      </div>
-      <div class="stat">
-        <span class="k">{{ days }} 天激活</span>
-        <span class="v">{{ periodActivations }}</span>
-        <span class="sub">今日 {{ data?.activations_day ?? 0 }} 张</span>
-      </div>
-      <div class="stat">
-        <span class="k">{{ days }} 天活跃设备</span>
-        <span class="v">{{ data?.active_devices ?? '—' }}</span>
-        <span class="sub">其中已绑定 {{ data?.devices_bound ?? 0 }} 台</span>
-      </div>
-      <div class="stat">
-        <span class="k">活跃代理</span>
-        <span class="v">{{ data?.agents_active ?? '—' }}</span>
-        <span class="sub">平台 + 代理出卡</span>
-      </div>
-    </div>
+    <StatStrip :items="stats" />
 
     <div class="grid">
       <n-card size="small" class="span-8">
@@ -212,20 +203,6 @@ onMounted(load)
 .toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
 .spacer { flex: 1; }
 .hint { font-size: 12px; color: #98a2b3; }
-
-.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-bottom: 12px; }
-.stat {
-  background: #fff;
-  border: 1px solid #e8edeb;
-  border-radius: 12px;
-  padding: 14px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.stat .k { font-size: 12px; color: #8b93a7; }
-.stat .v { font-size: 24px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
-.stat .sub { font-size: 11px; color: #98a2b3; }
 
 .grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 12px; }
 .span-8 { grid-column: span 8; }

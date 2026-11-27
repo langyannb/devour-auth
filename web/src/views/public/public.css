@@ -1,0 +1,30 @@
+/* 查卡 / 解绑两页共用的表单与结果样式 */
+h1 { margin: 0 0 8px; font-size: 22px; letter-spacing: -0.02em; }
+.lede { margin: 0 0 22px; color: #5b6478; font-size: 13.5px; line-height: 1.7; }
+.form { display: flex; gap: 10px; flex-wrap: wrap; }
+.form > :first-child { flex: 1; min-width: 200px; }
+.captcha { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+.captcha > :first-child { flex: 1; min-width: 120px; }
+.captcha-img {
+  height: 50px;
+  width: 160px;
+  object-fit: cover;
+  border-radius: 8px;
+  cursor: pointer;
+  border: 1px solid #e8eeeb;
+  background: #fff;
+}
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 0;
+  border-bottom: 1px solid #f1f4f3;
+  font-size: 14px;
+}
+.row:last-child { border-bottom: none; }
+.label { color: #8b93a7; font-size: 13px; }
+.foot { margin: 28px 0 0; font-size: 13px; color: #8b93a7; line-height: 1.7; }
+.foot a { color: #148c4f; text-decoration: none; }
+.foot a:hover { text-decoration: underline; }

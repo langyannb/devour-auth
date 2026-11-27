@@ -115,7 +115,15 @@ body,
   50% { transform: scale(1.05); box-shadow: 0 12px 28px -10px rgba(24, 160, 88, 0.7); }
 }
 
+/* 路由切换动效：管理端与代理端共用 */
+.page-enter-active,
+.page-leave-active { transition: opacity 0.16s ease, transform 0.16s ease; }
+.page-enter-from { opacity: 0; transform: translateY(6px); }
+.page-leave-to { opacity: 0; transform: translateY(-4px); }
+
 @media (prefers-reduced-motion: reduce) {
+  .page-enter-active,
+  .page-leave-active { transition: none; }
   .boot-brand, .boot-bar, .boot-tip { animation: none; }
   .boot-brand .mark { animation: none; }
   .boot-bar i { animation: none; width: 100%; }

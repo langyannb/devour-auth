@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { NAlert, NButton, NCard, NRadioButton, NRadioGroup } from 'naive-ui'
 import BarList from '../../components/charts/BarList.vue'
 import DonutChart from '../../components/charts/DonutChart.vue'
+import StatStrip from '../../components/StatStrip.vue'
 import TrendChart from '../../components/charts/TrendChart.vue'
 import { agentApi } from '../../api'
 import { formatTs, formatYuan, kindLabels, statusLabels } from '../../utils'
@@ -89,6 +90,14 @@ const quotaText = computed(() => {
   return q < 0 ? '不限' : `${formatYuan(q)} 元`
 })
 
+const stats = computed(() => [
+  { k: '可用余额', v: quotaText.value, sub: '出卡从这里扣' },
+  { k: `${days.value} 天出卡`, v: totalIssued.value, sub: '张（含下级）' },
+  { k: `${days.value} 天激活`, v: totalActivated.value, sub: '张' },
+  { k: '卡密总数', v: cardsTotal.value, sub: '你与下级的全部卡' },
+  { k: `${days.value} 天活跃设备`, v: data.value?.active_devices ?? '—', sub: '登录过的设备' },
+])
+
 onMounted(load)
 </script>
 
@@ -107,33 +116,7 @@ onMounted(load)
       <n-button size="small" :loading="loading" @click="load">刷新</n-button>
     </div>
 
-    <div class="stats">
-      <div class="stat">
-        <span class="k">可用余额</span>
-        <span class="v">{{ quotaText }}</span>
-        <span class="sub">出卡从这里扣</span>
-      </div>
-      <div class="stat">
-        <span class="k">{{ days }} 天出卡</span>
-        <span class="v">{{ totalIssued }}</span>
-        <span class="sub">张（含下级）</span>
-      </div>
-      <div class="stat">
-        <span class="k">{{ days }} 天激活</span>
-        <span class="v">{{ totalActivated }}</span>
-        <span class="sub">张</span>
-      </div>
-      <div class="stat">
-        <span class="k">卡密总数</span>
-        <span class="v">{{ cardsTotal }}</span>
-        <span class="sub">你与下级的全部卡</span>
-      </div>
-      <div class="stat">
-        <span class="k">{{ days }} 天活跃设备</span>
-        <span class="v">{{ data?.active_devices ?? '—' }}</span>
-        <span class="sub">登录过的设备</span>
-      </div>
-    </div>
+    <StatStrip :items="stats" />
 
     <div class="grid">
       <n-card size="small" class="span-8">
@@ -160,20 +143,6 @@ onMounted(load)
 .toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
 .spacer { flex: 1; }
 .hint { font-size: 12px; color: #98a2b3; }
-
-.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 12px; }
-.stat {
-  background: #fff;
-  border: 1px solid #e8edeb;
-  border-radius: 12px;
-  padding: 12px 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.stat .k { font-size: 12px; color: #8b93a7; }
-.stat .v { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
-.stat .sub { font-size: 11px; color: #98a2b3; }
 
 .grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 12px; }
 .span-12 { grid-column: span 12; }
