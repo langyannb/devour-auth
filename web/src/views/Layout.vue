@@ -14,9 +14,11 @@ const drawer = ref(false)
 const user = sessionStorage.getItem('devour_user') ?? ''
 
 const menu = computed<MenuOption[]>(() => [
+  { label: '概览', key: '/dashboard' },
   { label: '卡密', key: '/cards' },
   { label: '发卡', key: '/issue' },
   { label: '卡类型', key: '/policies' },
+  { label: '运营', key: '/ops' },
   { label: '审计', key: '/audit' },
   { label: '设置', key: '/settings' },
 ])

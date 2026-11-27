@@ -19,6 +19,27 @@ const page = ref(1)
 const pageSize = 50
 const err = ref('')
 const loading = ref(false)
+const verifyMsg = ref('')
+const verifying = ref(false)
+
+async function verifyChain() {
+  verifying.value = true
+  verifyMsg.value = ''
+  try {
+    const d = await api.get<{ ok_chain: boolean; entries: number; anchors?: number; error?: string }>(
+      '/admin/api/audit/verify',
+    )
+    if (d.ok_chain) {
+      verifyMsg.value = `链完整：${d.entries} 条记录，${d.anchors ?? 0} 个锚点`
+    } else {
+      verifyMsg.value = `校验失败：${d.error ?? '断链'}（已校验 ${d.entries} 条）`
+    }
+  } catch (e) {
+    verifyMsg.value = (e as Error).message
+  } finally {
+    verifying.value = false
+  }
+}
 
 const columns: DataTableColumns<AuditRow> = [
   { title: 'ID', key: 'id', width: 80 },
@@ -64,6 +85,10 @@ onMounted(load)
 <template>
   <div>
     <n-alert v-if="err" type="error" style="margin-bottom: 12px">{{ err }}</n-alert>
+    <n-space align="center" style="margin-bottom: 12px" :wrap="true">
+      <n-button size="small" :loading="verifying" @click="verifyChain">校验链</n-button>
+      <span v-if="verifyMsg" style="font-size: 13px; color: #4a5568">{{ verifyMsg }}</span>
+    </n-space>
     <n-data-table :columns="columns" :data="rows" :loading="loading" :bordered="false" size="small" :scroll-x="700" />
     <n-space justify="end" align="center" style="margin-top: 16px">
       <span>共 {{ total }} 条</span>

@@ -96,6 +96,8 @@ func (s *Server) Handler() http.Handler {
 
 	// 审计
 	mux.HandleFunc("GET /admin/api/audit", s.requireAdmin(s.listAudit))
+	mux.HandleFunc("GET /admin/api/audit/verify", s.requireAdmin(s.verifyAuditChain))
+	mux.HandleFunc("GET /admin/api/stats", s.requireAdmin(s.adminStats))
 
 	// 代理管理（管理员）
 	mux.HandleFunc("GET /admin/api/agents", s.requireAdmin(s.listAgents))

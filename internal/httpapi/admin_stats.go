@@ -1,0 +1,45 @@
+package httpapi
+
+import (
+	"crypto/ed25519"
+	"net/http"
+	"time"
+
+	"github.com/langyannb/devour-auth/internal/audit"
+)
+
+// adminStats 概览页的汇总数字。
+func (s *Server) adminStats(w http.ResponseWriter, r *http.Request) {
+	now := s.now()
+	dayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location()).Unix()
+	st, err := s.st.Stats(r.Context(), dayStart, now.Unix())
+	if err != nil {
+		internalErr(w, s.log, "统计失败", err)
+		return
+	}
+	writeData(w, map[string]any{
+		"cards_total":     st.CardsTotal,
+		"cards_by_status": st.CardsByStatus,
+		"devices_bound":   st.DevicesBound,
+		"agents_active":   st.AgentsActive,
+		"activations_day": st.ActivationsDay,
+		"online_sessions": st.OnlineSessions,
+		"server_time":     now.Unix(),
+	})
+}
+
+// verifyAuditChain 重算整链并校验每日锚点（后台「校验」按钮）。
+func (s *Server) verifyAuditChain(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	n, err := audit.Verify(ctx, s.st.DB())
+	if err != nil {
+		writeData(w, map[string]any{"ok_chain": false, "entries": n, "error": err.Error()})
+		return
+	}
+	m, err := audit.VerifyAnchors(ctx, s.st.DB(), s.ticketKey.Public().(ed25519.PublicKey))
+	if err != nil {
+		writeData(w, map[string]any{"ok_chain": false, "entries": n, "anchors": m, "error": err.Error()})
+		return
+	}
+	writeData(w, map[string]any{"ok_chain": true, "entries": n, "anchors": m})
+}

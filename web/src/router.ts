@@ -15,10 +15,12 @@ const adminRoutes: RouteRecordRaw[] = [
     path: '/',
     component: () => import('./views/Layout.vue'),
     children: [
-      { path: '', redirect: '/cards' },
+      { path: '', redirect: '/dashboard' },
+      { path: 'dashboard', component: () => import('./views/Overview.vue') },
       { path: 'cards', component: () => import('./views/Cards.vue') },
       { path: 'issue', component: () => import('./views/Issue.vue') },
       { path: 'policies', component: () => import('./views/Policies.vue') },
+      { path: 'ops', component: () => import('./views/Ops.vue') },
       { path: 'audit', component: () => import('./views/Audit.vue') },
       { path: 'settings', component: () => import('./views/Settings.vue') },
     ],
