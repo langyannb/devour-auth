@@ -1,8 +1,10 @@
 package httpapi
 
 import (
+	"encoding/csv"
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/langyannb/devour-auth/internal/auth"
 	"github.com/langyannb/devour-auth/internal/store"
@@ -91,16 +93,29 @@ func (s *Server) agentChangePassword(w http.ResponseWriter, r *http.Request) {
 // agentBillsExport 代理导出自己的流水 CSV。
 func (s *Server) agentBillsExport(w http.ResponseWriter, r *http.Request) {
 	c := agentFrom(r)
-	rows, _, err := s.st.ListAgentLedger(r.Context(), c.Agent.ID, 200, 0)
-	if err != nil {
-		internalErr(w, s.log, "导出失败", err)
-		return
+	// 先取全量再写响应：单页上限 200 条，分页拉完才不会截断
+	var all []store.AgentLedgerRow
+	for offset := 0; ; offset += 200 {
+		rows, total, err := s.st.ListAgentLedger(r.Context(), c.Agent.ID, 200, offset)
+		if err != nil {
+			internalErr(w, s.log, "导出失败", err)
+			return
+		}
+		all = append(all, rows...)
+		if len(rows) == 0 || int64(offset+len(rows)) >= total {
+			break
+		}
 	}
 	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
 	w.Header().Set("Content-Disposition", `attachment; filename="ledger.csv"`)
 	_, _ = w.Write([]byte{0xEF, 0xBB, 0xBF})
-	_, _ = w.Write([]byte("id,kind,amount_cents,ref,created_at\n"))
-	for _, x := range rows {
-		_, _ = fmt.Fprintf(w, "%d,%s,%d,%s,%d\n", x.ID, x.Kind, x.AmountCents, x.Ref, x.CreatedAt)
+	cw := csv.NewWriter(w)
+	defer cw.Flush()
+	_ = cw.Write([]string{"id", "kind", "amount_cents", "ref", "created_at"})
+	for _, x := range all {
+		_ = cw.Write([]string{
+			strconv.FormatInt(x.ID, 10), x.Kind, strconv.FormatInt(x.AmountCents, 10),
+			x.Ref, strconv.FormatInt(x.CreatedAt, 10),
+		})
 	}
 }
