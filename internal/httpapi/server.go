@@ -46,13 +46,13 @@ func (s *Server) Handler() http.Handler {
 	// 应用、卡类型、权限（改价/改策略需 reauth）
 	mux.HandleFunc("GET /admin/api/apps", s.requireAdmin(s.listApps))
 	mux.HandleFunc("GET /admin/api/policies", s.requireAdmin(s.listPolicies))
-	mux.HandleFunc("POST /admin/api/policies", s.requireAdmin(s.requireReauth(s.createPolicy)))
-	mux.HandleFunc("PATCH /admin/api/policies/{id}", s.requireAdmin(s.requireReauth(s.updatePolicy)))
+	mux.HandleFunc("POST /admin/api/policies", s.requireAdmin(s.requireRole("admin", s.requireReauth(s.createPolicy))))
+	mux.HandleFunc("PATCH /admin/api/policies/{id}", s.requireAdmin(s.requireRole("admin", s.requireReauth(s.updatePolicy))))
 	mux.HandleFunc("GET /admin/api/entitlements", s.requireAdmin(s.listEntitlements))
-	mux.HandleFunc("POST /admin/api/entitlements", s.requireAdmin(s.requireReauth(s.createEntitlement)))
+	mux.HandleFunc("POST /admin/api/entitlements", s.requireAdmin(s.requireRole("admin", s.requireReauth(s.createEntitlement))))
 
 	// 卡密
-	mux.HandleFunc("POST /admin/api/cards/generate", s.requireAdmin(s.generateCards))
+	mux.HandleFunc("POST /admin/api/cards/generate", s.requireAdmin(s.requireRole("admin", s.generateCards)))
 	mux.HandleFunc("GET /admin/api/cards", s.requireAdmin(s.listCards))
 	mux.HandleFunc("GET /admin/api/cards/{id}", s.requireAdmin(s.getCard))
 	mux.HandleFunc("POST /admin/api/cards/{id}/ban", s.requireAdmin(s.cardStatusAction("ban", s.cards.Ban)))

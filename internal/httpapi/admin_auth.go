@@ -207,6 +207,15 @@ func (s *Server) requireAdmin(next http.HandlerFunc) http.HandlerFunc {
 				return
 			}
 		}
+		// 管理端会话绑定 IP：cookie 被搬到别的网络立即失效（验收 14）。
+		if sess.IP != "" && sess.IP != clientIP(r) {
+			_ = s.st.RevokeAdminSession(ctx, sess.ID, now)
+			_, _ = s.st.DB().ExecContext(ctx,
+				`INSERT INTO events(ts, kind, ip, ua, code) VALUES(?,?,?,?,?)`,
+				now, "admin_session_ip_change", clientIP(r), truncate(r.UserAgent(), 200), CodeUnauthorized)
+			writeErr(w, http.StatusUnauthorized, CodeUnauthorized, "登录 IP 已变更，请重新登录")
+			return
+		}
 		admin, err := s.st.AdminByID(ctx, sess.AdminID)
 		if err != nil {
 			writeErr(w, http.StatusUnauthorized, CodeUnauthorized, "会话已失效")
@@ -214,6 +223,17 @@ func (s *Server) requireAdmin(next http.HandlerFunc) http.HandlerFunc {
 		}
 		_ = s.st.TouchAdminSession(ctx, sess.ID, now)
 		next(w, r.WithContext(context.WithValue(r.Context(), adminCtxKey{}, adminCtx{Admin: admin, Session: sess})))
+	}
+}
+
+// requireRole 在 requireAdmin 之后使用：operator 不能改价、改策略、发卡、碰账号。
+func (s *Server) requireRole(role string, next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if adminFrom(r).Admin.Role != role {
+			writeErr(w, http.StatusForbidden, CodeUnauthorized, "权限不足")
+			return
+		}
+		next(w, r)
 	}
 }
 

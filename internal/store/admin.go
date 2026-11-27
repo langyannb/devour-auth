@@ -81,6 +81,7 @@ type AdminSession struct {
 	ID          int64
 	AdminID     int64
 	CSRF        string
+	IP          string
 	CreatedAt   int64
 	LastSeen    int64
 	ExpiresAt   int64
@@ -104,9 +105,9 @@ func (s *Store) AdminSessionByTokenHash(ctx context.Context, tokenHash string) (
 		revokedAt sql.NullInt64
 	)
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, admin_id, csrf_token, created_at, last_seen, expires_at, reauth_until, revoked_at
+		`SELECT id, admin_id, csrf_token, COALESCE(ip,''), created_at, last_seen, expires_at, reauth_until, revoked_at
 		   FROM admin_sessions WHERE token_hash = ?`, tokenHash).
-		Scan(&sess.ID, &sess.AdminID, &sess.CSRF, &sess.CreatedAt, &sess.LastSeen,
+		Scan(&sess.ID, &sess.AdminID, &sess.CSRF, &sess.IP, &sess.CreatedAt, &sess.LastSeen,
 			&sess.ExpiresAt, &sess.ReauthUntil, &revokedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return AdminSession{}, ErrNotFound
