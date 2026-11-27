@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { h, onMounted, ref } from 'vue'
+import { computed, h, onMounted, ref } from 'vue'
 import { NAlert, NButton, NDataTable, NForm, NFormItem, NInput, NModal, NSelect, NSpace, NTag, type DataTableColumns } from 'naive-ui'
 import { api } from '../api'
 import { formatTs } from '../utils'
 
-interface Acc { id: number; username: string; role: string; totp_enabled: boolean; ip_allow: string; created_at: number; unused_recovery_codes: number }
+interface Acc { id: number; username: string; role: string; totp_enabled: boolean; ip_allow: string; created_at: number; unused_recovery_codes: number; app_id: number }
 
 const rows = ref<Acc[]>([])
 const err = ref('')
@@ -12,7 +12,12 @@ const notice = ref('')
 const loading = ref(false)
 const showCreate = ref(false)
 const busy = ref(false)
-const form = ref({ username: '', password: '', role: 'operator' })
+const form = ref({ username: '', password: '', role: 'operator', app_id: 0 })
+const apps = ref<{ id: number; code: string; name: string }[]>([])
+const appOptions = computed(() => [
+  { label: '全局（所有应用）', value: 0 },
+  ...apps.value.map((a) => ({ label: `${a.name}（${a.code}）`, value: a.id })),
+])
 const showIP = ref(false)
 const ipTarget = ref<Acc | null>(null)
 const ipValue = ref('')
@@ -22,7 +27,10 @@ const secrets = ref<{ username: string; password: string; codes: string[] } | nu
 async function load() {
   loading.value = true
   err.value = ''
-  try { rows.value = await api.get<Acc[]>('/admin/api/accounts') } catch (e) { err.value = (e as Error).message } finally { loading.value = false }
+  try {
+    rows.value = await api.get<Acc[]>('/admin/api/accounts')
+    apps.value = await api.get<{ id: number; code: string; name: string }[]>('/admin/api/apps')
+  } catch (e) { err.value = (e as Error).message } finally { loading.value = false }
 }
 
 async function create() {
@@ -32,7 +40,7 @@ async function create() {
     const d = await api.post<{ username: string; password: string; recovery_codes: string[] }>('/admin/api/accounts', form.value)
     secrets.value = { username: d.username, password: d.password, codes: d.recovery_codes }
     showCreate.value = false
-    form.value = { username: '', password: '', role: 'operator' }
+    form.value = { username: '', password: '', role: 'operator', app_id: 0 }
     await load()
   } catch (e) { err.value = (e as Error).message } finally { busy.value = false }
 }
@@ -69,6 +77,12 @@ const cols: DataTableColumns<Acc> = [
   { title: 'ID', key: 'id', width: 60 },
   { title: '用户名', key: 'username', width: 160 },
   { title: '角色', key: 'role', width: 100 },
+  {
+    title: '应用',
+    key: 'app_id',
+    width: 130,
+    render: (r) => (r.app_id ? apps.value.find((a) => a.id === r.app_id)?.name ?? `#${r.app_id}` : '全部'),
+  },
   { title: 'TOTP', key: 'totp_enabled', width: 80, render: (r) => (r.totp_enabled ? '已启用' : '未启用') },
   { title: '恢复码剩余', key: 'unused_recovery_codes', width: 110 },
   { title: 'IP 白名单', key: 'ip_allow', width: 200, ellipsis: { tooltip: true }, render: (r) => r.ip_allow || '不限' },
@@ -112,6 +126,9 @@ onMounted(load)
       <n-form label-placement="top">
         <n-form-item label="用户名">
           <n-input v-model:value="form.username" />
+        </n-form-item>
+        <n-form-item label="绑定应用">
+          <n-select v-model:value="form.app_id" :options="appOptions" />
         </n-form-item>
         <n-form-item label="角色">
           <n-select v-model:value="form.role" :options="[{label:'operator（不能改价/发卡/管账号）',value:'operator'},{label:'admin（全部）',value:'admin'}]" />

@@ -2,7 +2,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { NAlert, NButton, NCard, NForm, NFormItem, NInput } from 'naive-ui'
-import { api, authed, markSignedIn, setCSRF } from '../api'
+import { api, authed, markSignedIn, setAdminApp, setCSRF } from '../api'
 
 const router = useRouter()
 const username = ref('')
@@ -13,7 +13,7 @@ const busy = ref(false)
 
 interface LoginData {
   csrf_token: string
-  admin: { id: number; username: string; role: string }
+  admin: { id: number; username: string; role: string; app_id: number }
 }
 
 async function submit() {
@@ -26,6 +26,7 @@ async function submit() {
       totp: totp.value,
     })
     setCSRF(d.csrf_token)
+    setAdminApp(d.admin.app_id)
     sessionStorage.setItem('devour_user', `${d.admin.username} · ${d.admin.role}`)
     authed.value = true
     markSignedIn()

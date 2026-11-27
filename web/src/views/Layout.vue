@@ -3,7 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { NSelect, type MenuOption } from 'naive-ui'
 import PortalShell from '../components/PortalShell.vue'
-import { api, getCSRF, getCurrentApp, markSignedOut, setCurrentApp, tryRestore } from '../api'
+import { adminAppID, api, getCSRF, getCurrentApp, markSignedOut, setCurrentApp, tryRestore } from '../api'
 import ReauthDialog from './ReauthDialog.vue'
 
 const router = useRouter()
@@ -11,7 +11,9 @@ const rawUser = sessionStorage.getItem('devour_user') ?? ''
 const user = rawUser.split(' · ')[0]
 const initial = (user || 'A').slice(0, 1).toUpperCase()
 
-const menu = computed<MenuOption[]>(() => [
+const scoped = computed(() => adminAppID.value > 0)
+
+const fullMenu = computed<MenuOption[]>(() => [
   { label: '概览', key: '/dashboard' },
   { label: '数据', key: '/analytics' },
   {
@@ -75,6 +77,49 @@ const menu = computed<MenuOption[]>(() => [
     ],
   },
 ])
+
+// 绑定应用的账号只看自己那摊：没有代理/财务/应用管理/审计/运营
+const menu = computed<MenuOption[]>(() => {
+  if (!scoped.value) return fullMenu.value
+  return [
+    { label: '概览', key: '/dashboard' },
+    { label: '数据', key: '/analytics' },
+    {
+      type: 'group',
+      key: 'g-cards',
+      label: '卡务',
+      children: [
+        { label: '卡密', key: '/cards' },
+        { label: '发卡', key: '/issue' },
+        { label: '设备', key: '/devices' },
+        { label: '在线', key: '/sessions' },
+        { label: '黑名单', key: '/blacklist' },
+      ],
+    },
+    {
+      type: 'group',
+      key: 'g-content',
+      label: '内容',
+      children: [{ label: '权限包', key: '/entitlements' }],
+    },
+    {
+      type: 'group',
+      key: 'g-integration',
+      label: '集成',
+      children: [
+        { label: '开放接口', key: '/open' },
+        { label: '回调', key: '/webhooks' },
+      ],
+    },
+    {
+      type: 'group',
+      key: 'g-ops',
+      label: '运维',
+      children: [{ label: '日志', key: '/events' }],
+    },
+    { label: '设置', key: '/settings' },
+  ]
+})
 
 function onMenu(key: string) {
   router.push(key)

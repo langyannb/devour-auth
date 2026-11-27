@@ -16,6 +16,12 @@ export function setCurrentApp(id: string) {
 }
 export const agentAuthed = ref(false)
 
+// 当前管理员绑定的应用：0 = 全局，>0 = 只能看这个应用
+export const adminAppID = ref(0)
+export function setAdminApp(id: number | undefined) {
+  adminAppID.value = id ?? 0
+}
+
 // 主动退出后，本次页面生命周期内不再尝试恢复会话，
 // 否则退出请求失败时路由守卫会立刻把人送回后台（看起来像「退出没反应」）。
 let signedOut = false
@@ -141,8 +147,9 @@ export const agentApi = {
 export async function tryRestore(): Promise<boolean> {
   if (signedOut) return false
   try {
-    const me = await request<{ csrf_token?: string; username?: string; role?: string }>('/admin/api/me')
+    const me = await request<{ csrf_token?: string; username?: string; role?: string; app_id?: number }>('/admin/api/me')
     if (me?.csrf_token) setCSRF(me.csrf_token)
+    setAdminApp(me?.app_id)
     // 新标签页/刷新后 sessionStorage 是空的，用 /me 补回来
     if (me?.username) sessionStorage.setItem('devour_user', `${me.username} · ${me.role ?? ''}`)
     authed.value = true
