@@ -6,7 +6,7 @@ import {
   NInputNumber, NModal, NSpace, NTag, type DataTableColumns,
 } from 'naive-ui'
 import { api } from '../api'
-import { formatTs, kindLabels, statusLabels } from '../utils'
+import { formatExpiry, formatTs, kindLabels, statusLabels } from '../utils'
 
 interface Card {
   id: number
@@ -203,7 +203,7 @@ onMounted(load)
       <n-descriptions :column="2" label-placement="left" size="small" bordered>
         <n-descriptions-item label="ID">{{ card.id }}</n-descriptions-item>
         <n-descriptions-item label="类型">{{ kindLabels[card.kind] ?? card.kind }}</n-descriptions-item>
-        <n-descriptions-item label="到期">{{ card.expire_at ? formatTs(card.expire_at) : '永久' }}</n-descriptions-item>
+        <n-descriptions-item label="到期">{{ formatExpiry(card.kind, card.expire_at, card.remaining_seconds) }}</n-descriptions-item>
         <n-descriptions-item label="余额">
           <span v-if="card.kind === 'credit'">{{ card.points }} 点</span>
           <span v-else-if="card.kind === 'count'">{{ card.remain_times }} 次</span>

@@ -6,7 +6,7 @@ import {
   type DataTableColumns,
 } from 'naive-ui'
 import { api } from '../api'
-import { formatTs, kindLabels, statusLabels } from '../utils'
+import { copyText, formatExpiry, formatTs, kindLabels, statusLabels } from '../utils'
 
 interface Card {
   id: number
@@ -82,15 +82,16 @@ const columns = computed<DataTableColumns<Card>>(() => [
     },
   },
   { title: '设备上限', key: 'device_limit', width: 86 },
-  { title: '到期', key: 'expire_at', width: 140, render: (r) => (r.expire_at ? formatTs(r.expire_at) : '永久') },
+  { title: '到期', key: 'expire_at', width: 140, render: (r) => formatExpiry(r.kind, r.expire_at, r.remaining_seconds) },
   { title: '来源', key: 'agent_id', width: 80, render: (r) => (r.agent_id ? `代理${r.agent_id}` : '平台') },
   {
     title: '操作',
     key: 'op',
-    width: 150,
+    width: 200,
     render: (r) =>
       h(NSpace, { size: 4 }, {
         default: () => [
+          h(NButton, { size: 'tiny', onClick: () => copyKami(r.kami) }, { default: () => '复制' }),
           h(NButton, {
             size: 'tiny',
             type: r.status === 'banned' ? 'success' : 'error',
@@ -101,6 +102,12 @@ const columns = computed<DataTableColumns<Card>>(() => [
       }),
   },
 ])
+
+async function copyKami(kami: string) {
+  err.value = ''
+  if (await copyText(kami)) notice.value = `已复制 ${kami}`
+  else err.value = '复制失败，请手动选中卡密'
+}
 
 async function load() {
   loading.value = true

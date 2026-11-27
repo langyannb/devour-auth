@@ -2,7 +2,7 @@
 import { computed, h, onMounted, ref } from 'vue'
 import { NAlert, NButton, NDataTable, NInput, NPagination, NSpace, NTag, type DataTableColumns } from 'naive-ui'
 import { agentApi } from '../../api'
-import { formatTs, kindLabels, statusLabels } from '../../utils'
+import { copyText, formatExpiry, formatTs, kindLabels, statusLabels } from '../../utils'
 
 interface Card {
   id: number
@@ -12,6 +12,7 @@ interface Card {
   agent_id: number | null
   points: number
   remain_times: number
+  remaining_seconds: number
   expire_at: number
   created_at: number
 }
@@ -60,15 +61,16 @@ const columns = computed<DataTableColumns<Card>>(() => [
       return '—'
     },
   },
-  { title: '到期', key: 'expire_at', width: 150, render: (r) => (r.expire_at ? formatTs(r.expire_at) : '永久') },
+  { title: '到期', key: 'expire_at', width: 150, render: (r) => formatExpiry(r.kind, r.expire_at, r.remaining_seconds) },
   { title: '创建', key: 'created_at', width: 150, render: (r) => formatTs(r.created_at) },
   {
     title: '操作',
     key: 'op',
-    width: 140,
+    width: 190,
     render: (r) =>
       h(NSpace, { size: 4 }, {
         default: () => [
+          h(NButton, { size: 'tiny', onClick: () => copyKami(r.kami) }, { default: () => '复制' }),
           h(NButton, {
             size: 'tiny',
             type: r.status === 'banned' ? 'success' : 'error',
@@ -79,6 +81,12 @@ const columns = computed<DataTableColumns<Card>>(() => [
       }),
   },
 ])
+
+async function copyKami(kami: string) {
+  err.value = ''
+  if (await copyText(kami)) notice.value = `已复制 ${kami}`
+  else err.value = '复制失败，请手动选中卡密'
+}
 
 async function act(r: Card, action: string) {
   err.value = ''
