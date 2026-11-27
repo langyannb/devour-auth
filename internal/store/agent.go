@@ -214,7 +214,7 @@ type AgentBill struct {
 }
 
 // BillingMonth 汇总某代理某月的 issue 流水，生成或更新 open 账单。
-func (s *Store) UpsertAgentBill(ctx context.Context, agentID int64, month string, monthStart, monthEnd int64) (bool, error) {
+func (s *Store) UpsertAgentBill(ctx context.Context, agentID int64, month string, monthStart, monthEnd, now int64) (bool, error) {
 	var amount sql.NullInt64
 	if err := s.db.QueryRowContext(ctx,
 		`SELECT SUM(amount_cents) FROM agent_ledger
@@ -226,11 +226,11 @@ func (s *Store) UpsertAgentBill(ctx context.Context, agentID int64, month string
 		return false, nil
 	}
 	res, err := s.db.ExecContext(ctx,
-		`INSERT INTO agent_bills(agent_id, month, amount_cents, status)
-		 VALUES(?,?,?, 'open')
+		`INSERT INTO agent_bills(agent_id, month, amount_cents, status, created_at)
+		 VALUES(?,?,?, 'open', ?)
 		 ON CONFLICT(agent_id, month) DO UPDATE SET amount_cents = excluded.amount_cents
 		 WHERE agent_bills.status = 'open'`,
-		agentID, month, amount.Int64)
+		agentID, month, amount.Int64, now)
 	if err != nil {
 		return false, err
 	}

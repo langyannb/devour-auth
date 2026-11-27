@@ -215,7 +215,7 @@ func (s *Service) GenerateBills(ctx context.Context, month string) (int, error) 
 	}
 	n := 0
 	for _, a := range agents {
-		ok, err := s.st.UpsertAgentBill(ctx, a.ID, month, start, end)
+		ok, err := s.st.UpsertAgentBill(ctx, a.ID, month, start, end, s.now().Unix())
 		if err != nil {
 			return n, err
 		}

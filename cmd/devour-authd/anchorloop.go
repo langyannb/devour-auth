@@ -56,6 +56,12 @@ func startRollup(ctx context.Context, st *store.Store, log *slog.Logger) {
 				continue
 			}
 			log.Info("统计汇总完成", "day", key, "logins", stat.Logins, "activations", stat.Activations)
+			// 回调投递记录留 30 天，够查问题就行
+			if n, err := st.PruneDeliveries(ctx, time.Now().AddDate(0, 0, -30).Unix()); err != nil {
+				log.Error("清理回调投递失败", "err", err)
+			} else if n > 0 {
+				log.Info("已清理回调投递", "rows", n)
+			}
 		}
 	}()
 }

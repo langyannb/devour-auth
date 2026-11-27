@@ -117,6 +117,15 @@ func (s *Store) CreateWebhookDelivery(ctx context.Context, d WebhookDelivery) er
 }
 
 // ListWebhookDeliveries 最近的投递记录，按时间倒序。
+// PruneDeliveries 清掉早于 before 的投递记录，避免只增不减。
+func (s *Store) PruneDeliveries(ctx context.Context, before int64) (int64, error) {
+	res, err := s.db.ExecContext(ctx, `DELETE FROM webhook_deliveries WHERE created_at < ?`, before)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
 func (s *Store) ListWebhookDeliveries(ctx context.Context, limit int) ([]WebhookDelivery, error) {
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT id, webhook_id, event, url, attempts, ok, status_code, error, created_at, finished_at

@@ -45,7 +45,11 @@ func (s *Server) opsStatus(w http.ResponseWriter, r *http.Request) {
 	out.Rollup.NextAt = nextDaily(now, 0, 7)
 
 	var month string
+	var billsAt int64
 	if err := s.st.DB().QueryRowContext(ctx,
+		`SELECT COALESCE(MAX(created_at), 0) FROM agent_bills`).Scan(&billsAt); err == nil && billsAt > 0 {
+		out.Bills.LastAt = billsAt
+	} else if err := s.st.DB().QueryRowContext(ctx,
 		`SELECT month FROM agent_bills ORDER BY month DESC LIMIT 1`).Scan(&month); err == nil {
 		out.Bills.LastAt = dayUnix(month, "2006-01")
 	}
