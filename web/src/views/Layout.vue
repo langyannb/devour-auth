@@ -24,6 +24,7 @@ const menu = computed<MenuOption[]>(() => [
   { label: '卡类型', key: '/policies' },
   { label: '权限', key: '/entitlements' },
   { label: '代理', key: '/agents' },
+  { label: '价格模板', key: '/plans' },
   { label: '财务', key: '/finance' },
   { label: '运营', key: '/ops' },
   { label: '对接', key: '/open' },

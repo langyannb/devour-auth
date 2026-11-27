@@ -215,9 +215,46 @@ func (s *Server) agentPolicies(w http.ResponseWriter, r *http.Request) {
 }
 
 type agentIssueReq struct {
+	// 新模型：按价格模板出卡
+	Kind        string   `json:"kind"`
+	Multiplier  int64    `json:"multiplier"`
+	Value       int64    `json:"value"`
+	Unit        string   `json:"unit"`
+	DeviceLimit int64    `json:"device_limit"`
+	Kamis       []string `json:"kamis"`
+	// 旧模型
 	PolicyID int64  `json:"policy_id"`
 	Qty      int    `json:"qty"`
 	Prefix   string `json:"prefix"`
+}
+
+// agentPlan 返回代理商绑定的价格模板与权限（出卡页用）。
+func (s *Server) agentPlan(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	c := agentFrom(r)
+	perms, planID, err := s.st.AgentPermissions(ctx, c.Agent.ID)
+	if err != nil {
+		internalErr(w, s.log, "查权限失败", err)
+		return
+	}
+	if planID == 0 {
+		writeData(w, map[string]any{"plan": nil, "permissions": perms})
+		return
+	}
+	plan, err := s.st.AgentPlanByID(ctx, planID)
+	if err != nil {
+		writeData(w, map[string]any{"plan": nil, "permissions": perms})
+		return
+	}
+	items := make([]map[string]any, 0, len(plan.Items))
+	for kind, price := range plan.Items {
+		name := map[string]string{"day": "天卡", "week": "周卡", "month": "月卡", "forever": "永久卡", "custom": "自定义时间"}[kind]
+		items = append(items, map[string]any{"kind": kind, "name": name, "price_cents": price})
+	}
+	writeData(w, map[string]any{
+		"plan":        map[string]any{"id": plan.ID, "name": plan.Name, "items": items},
+		"permissions": perms,
+	})
 }
 
 func (s *Server) agentIssue(w http.ResponseWriter, r *http.Request) {
@@ -226,6 +263,30 @@ func (s *Server) agentIssue(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &req) {
 		return
 	}
+
+	// 新模型：按价格模板出卡
+	if req.Kind != "" {
+		app, err := s.appFromQuery(r)
+		if err != nil {
+			writeErr(w, http.StatusBadRequest, CodeBadInput, "应用不存在")
+			return
+		}
+		res, err := s.agents.IssueByPlan(r.Context(), agent.PlanIssueReq{
+			AgentID: c.Agent.ID, AppID: app.ID,
+			Kind: req.Kind, Multiplier: req.Multiplier, Value: req.Value, Unit: req.Unit,
+			Qty: req.Qty, DeviceLimit: req.DeviceLimit, Kamis: req.Kamis,
+			IP: clientIP(r),
+		})
+		if err != nil {
+			s.writeAPIError(w, err)
+			return
+		}
+		writeData(w, map[string]any{
+			"batch_id": res.BatchID, "kamis": res.Kamis, "payable": res.Payable, "rebate": res.Rebate,
+		})
+		return
+	}
+
 	res, err := s.agents.Issue(r.Context(), agent.IssueReq{
 		AgentID:  c.Agent.ID,
 		PolicyID: req.PolicyID,
