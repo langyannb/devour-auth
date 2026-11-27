@@ -171,7 +171,9 @@ func (s *Service) Login(ctx context.Context, req LoginReq, ip, ua string) (Sessi
 	verifyDevice := flags["verify_device"] != "0"
 	verifyIP := flags["verify_ip"] == "1"
 
-	devID, err := s.bindDevice(ctx, tx, &row, snap, req, now.Unix(), verifyDevice)
+	// 单卡开关优先：卡上关掉设备校验就不限设备数量
+	enforceDevice := verifyDevice && row.VerifyDevice != 0
+	devID, err := s.bindDevice(ctx, tx, &row, snap, req, now.Unix(), enforceDevice)
 	if err != nil {
 		return SessionView{}, err
 	}

@@ -15,6 +15,7 @@ interface Card {
   status: string
   policy_id: number
   device_limit: number
+  verify_device: number
   expire_at: number
   remain_times: number
   points: number
@@ -104,6 +105,22 @@ async function act(action: string) {
   try {
     await api.post(`/admin/api/cards/${id}/${action}`)
     notice.value = '操作成功'
+    await load()
+  } catch (e) {
+    err.value = (e as Error).message
+  } finally {
+    busy.value = false
+  }
+}
+
+async function toggleVerifyDevice() {
+  busy.value = true
+  err.value = ''
+  notice.value = ''
+  try {
+    const on = card.value?.verify_device === 0 // 当前关着就打开
+    await api.patch(`/admin/api/cards/${id}`, { verify_device: on })
+    notice.value = on ? '已开启设备校验' : '已关闭设备校验（不限设备数量）'
     await load()
   } catch (e) {
     err.value = (e as Error).message
@@ -217,7 +234,10 @@ onMounted(load)
           <span v-else-if="card.kind === 'timed'">{{ Math.floor(card.remaining_seconds / 60) }} 分钟</span>
           <span v-else>不限</span>
         </n-descriptions-item>
-        <n-descriptions-item label="设备">{{ card.bound_devices }} / {{ card.device_limit }}</n-descriptions-item>
+        <n-descriptions-item label="设备">
+          {{ card.bound_devices }} / {{ card.device_limit }}
+          <n-tag v-if="card.verify_device === 0" size="small" type="warning" style="margin-left: 6px">不校验设备</n-tag>
+        </n-descriptions-item>
         <n-descriptions-item label="换绑已用">{{ card.rebind_used }} 次</n-descriptions-item>
         <n-descriptions-item label="激活">{{ card.activated_at ? formatTs(card.activated_at) : '未激活' }}</n-descriptions-item>
         <n-descriptions-item label="创建">{{ formatTs(card.created_at) }}</n-descriptions-item>
@@ -229,6 +249,9 @@ onMounted(load)
       <n-space style="margin-top: 14px" :wrap="true">
         <n-button size="small" type="primary" :loading="busy" @click="showExtend = true">续期 / 加点</n-button>
         <n-button size="small" :loading="busy" @click="openLimit">改设备上限</n-button>
+        <n-button size="small" :loading="busy" @click="toggleVerifyDevice">
+          {{ card.verify_device === 0 ? '开启设备校验' : '关闭设备校验' }}
+        </n-button>
         <n-button size="small" :loading="busy" @click="act('unbind')">清空设备</n-button>
         <n-button size="small" :loading="busy" @click="act('reset-rebind')">重置换绑次数</n-button>
         <n-button size="small" type="error" :loading="busy" @click="act('ban')">封禁</n-button>

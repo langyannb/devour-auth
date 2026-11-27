@@ -20,8 +20,9 @@ func (s *Server) patchCard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
-		DeviceLimit *int64  `json:"device_limit"`
-		Note        *string `json:"note"`
+		DeviceLimit  *int64  `json:"device_limit"`
+		VerifyDevice *bool   `json:"verify_device"`
+		Note         *string `json:"note"`
 	}
 	if !decode(w, r, &req) {
 		return
@@ -37,6 +38,12 @@ func (s *Server) patchCard(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.DeviceLimit != nil {
 		if err := s.cards.SetDeviceLimit(ctx, id, *req.DeviceLimit, ch("card.set_device_limit")); err != nil {
+			s.writeAPIError(w, err)
+			return
+		}
+	}
+	if req.VerifyDevice != nil {
+		if err := s.cards.SetVerifyDevice(ctx, id, *req.VerifyDevice, ch("card.set_verify_device")); err != nil {
 			s.writeAPIError(w, err)
 			return
 		}

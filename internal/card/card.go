@@ -458,6 +458,18 @@ func (s *Service) ResetRebind(ctx context.Context, id int64, ch StatusChange) er
 	})
 }
 
+// SetVerifyDevice 单卡开关设备校验（0 = 不限制设备数量）。
+func (s *Service) SetVerifyDevice(ctx context.Context, id int64, on bool, ch StatusChange) error {
+	v := int64(0)
+	if on {
+		v = 1
+	}
+	return s.mutate(ctx, id, ch, func(c *store.Card, now int64) error {
+		c.VerifyDevice = v
+		return nil
+	})
+}
+
 // SetDeviceLimit 改单卡设备上限，同时改快照（老卡也按新上限执行）。
 func (s *Service) SetDeviceLimit(ctx context.Context, id, limit int64, ch StatusChange) error {
 	if limit < 1 || limit > 100 {
