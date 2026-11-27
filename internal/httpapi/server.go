@@ -102,6 +102,7 @@ func (s *Server) Handler() http.Handler {
 
 	// 卡密
 	mux.HandleFunc("POST /admin/api/cards/generate", s.requireAdmin(s.requireRole("admin", s.generateCards)))
+	mux.HandleFunc("POST /admin/api/cards/quick", s.requireAdmin(s.requireRole("admin", s.quickGenerate)))
 	mux.HandleFunc("GET /admin/api/cards", s.requireAdmin(s.listCards))
 	mux.HandleFunc("GET /admin/api/cards/export", s.requireAdmin(s.exportCards))
 	mux.HandleFunc("POST /admin/api/cards/batch", s.requireAdmin(s.batchCards))

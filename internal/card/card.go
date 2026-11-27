@@ -18,6 +18,9 @@ import (
 // MaxBatchQty 单批发卡上限（design.md 第 9 节）。
 const MaxBatchQty = 500
 
+// DefaultKamiLength 默认随机段长度。
+const DefaultKamiLength = 12
+
 // kamiAlphabet 去掉易混字符；32 个字符正好整除 256，取模无偏。
 const kamiAlphabet = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"
 
@@ -26,9 +29,16 @@ var (
 	ErrState   = errors.New("当前状态不允许该操作")
 )
 
-// NewKami 生成「前缀-XXXX-XXXX-XXXX」格式的卡密。
-func NewKami(prefix string) (string, error) {
-	b := make([]byte, 12)
+// NewKami 生成卡密：前缀 + 指定长度的随机串（默认 12）。
+// 长度 ≤16 时按 4 位分组（DV-XXXX-XXXX-XXXX），更长则连续。
+func NewKami(prefix string, length int) (string, error) {
+	if length <= 0 {
+		length = DefaultKamiLength
+	}
+	if length > 128 {
+		length = 128
+	}
+	b := make([]byte, length)
 	if _, err := rand.Read(b); err != nil {
 		return "", err
 	}
@@ -37,8 +47,9 @@ func NewKami(prefix string) (string, error) {
 		sb.WriteString(p)
 		sb.WriteByte('-')
 	}
-	for i := 0; i < 12; i++ {
-		if i > 0 && i%4 == 0 {
+	grouped := length <= 16
+	for i := 0; i < length; i++ {
+		if grouped && i > 0 && i%4 == 0 {
 			sb.WriteByte('-')
 		}
 		sb.WriteString(string(kamiAlphabet[int(b[i])%len(kamiAlphabet)]))
@@ -151,6 +162,12 @@ type GenerateReq struct {
 	Actor     string // admin:1
 	IP        string
 	Note      string
+	// KamiLength 随机段长度，0 = 12。
+	KamiLength int
+	// DurationSeconds 覆盖策略时长（时间类卡），0 = 用策略值。
+	DurationSeconds int64
+	// DeviceLimit 覆盖设备上限，0 = 用策略值。
+	DeviceLimit int64
 	// Kamis 非空时使用调用方指定的卡密（自定义 / CSV 导入），Qty 必须与之一致。
 	Kamis []string
 	// Hook 在同一事务提交前执行，用于代理记账等需要与发卡原子化的写入。
@@ -202,13 +219,25 @@ func (s *Service) Generate(ctx context.Context, req GenerateReq) (GenerateResult
 	if err != nil {
 		return GenerateResult{}, err
 	}
-	snapJSON, err := json.Marshal(BuildSnapshot(p, entCodes))
+	snap := BuildSnapshot(p, entCodes)
+	if req.DurationSeconds > 0 {
+		snap.DurationDays = 0
+		snap.DurationHours = 0
+		snap.DurationSeconds = req.DurationSeconds
+	}
+	if req.DeviceLimit > 0 {
+		snap.DeviceLimit = req.DeviceLimit
+	}
+	snapJSON, err := json.Marshal(snap)
 	if err != nil {
 		return GenerateResult{}, err
 	}
 
 	now := s.now().Unix()
 	expireAt, remainTimes, points, remainSec := initialBalance(p)
+	if req.DurationSeconds > 0 && p.Kind == store.KindTimed {
+		remainSec = req.DurationSeconds
+	}
 
 	tx, err := s.st.DB().BeginTx(ctx, nil)
 	if err != nil {
@@ -244,7 +273,7 @@ func (s *Service) Generate(ctx context.Context, req GenerateReq) (GenerateResult
 				kami = strings.TrimSpace(req.Kamis[i])
 			} else {
 				var err error
-				kami, err = NewKami(req.Prefix)
+				kami, err = NewKami(req.Prefix, req.KamiLength)
 				if err != nil {
 					return GenerateResult{}, err
 				}
@@ -257,7 +286,7 @@ func (s *Service) Generate(ctx context.Context, req GenerateReq) (GenerateResult
 				Status:           store.CardUnused,
 				BatchID:          sql.NullInt64{Int64: batchID, Valid: true},
 				AgentID:          agentID,
-				DeviceLimit:      p.DeviceLimit,
+				DeviceLimit:      snap.DeviceLimit,
 				ExpireAt:         expireAt,
 				RemainTimes:      remainTimes,
 				Points:           points,

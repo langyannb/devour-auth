@@ -164,3 +164,27 @@ func (s *Store) UpdatePolicy(ctx context.Context, p Policy) error {
 		p.Renewable, p.TrialPerDevice, p.PriceCents, p.Active, p.ID)
 	return err
 }
+
+// EnsureQuickPolicy 取或创建「快捷发卡」用的模板策略（code 以 _quick 开头）。
+func (s *Store) EnsureQuickPolicy(ctx context.Context, appID int64, kind string, now int64) (Policy, error) {
+	code := "_quick_" + kind
+	p, err := s.PolicyByCode(ctx, appID, code)
+	if err == nil {
+		return p, nil
+	}
+	if !errors.Is(err, ErrNotFound) {
+		return Policy{}, err
+	}
+	tpl := Policy{
+		AppID: appID, Code: code, Name: "快捷-" + kind, Kind: kind,
+		DeviceLimit: 1, ConcurrentLimit: 1, HeartbeatSec: 600,
+		OfflineHours: 24, OfflineStarts: 20, RebindFree: 1,
+		RebindCooldownDays: 30, Renewable: 1, TrialPerDevice: 1,
+		Active: 1, CreatedAt: now,
+	}
+	id, err := s.CreatePolicy(ctx, tpl)
+	if err != nil {
+		return Policy{}, err
+	}
+	return s.PolicyByID(ctx, id)
+}
