@@ -60,19 +60,13 @@ ssh root@43.248.187.94 'chmod 755 /opt/devour-auth/devour-authd'
 ```
 DEVOUR_LISTEN=127.0.0.1:6760
 DEVOUR_DB=/var/lib/devour/app.db
-DEVOUR_BASE_URL=https://net.namikao.com
-DEVOUR_ADMIN_IP_ALLOW=          # 空 = 不限；生产建议填办公/家庭出口 IP
-DEVOUR_SIGNING_KEY=/etc/devour-authd/offline-ed25519.key
-DEVOUR_LOG_LEVEL=info
+DEVOUR_ENV=prod
+DEVOUR_AUDIT_KEY=/etc/devour-authd/audit_ed25519.key
 ```
 
-密钥生成：
-
-```bash
-install -d -m 700 /etc/devour-authd
-openssl rand -hex 32 > /etc/devour-authd/offline-ed25519.key
-chmod 600 /etc/devour-authd/offline-ed25519.key
-```
+- `DEVOUR_ENV=prod` 时管理端 cookie 用 `__Host-` 前缀并带 `Secure`，必须走 HTTPS。
+- 审计私钥首次启动自动生成（0600，64 字节 Ed25519），也可靠 `DEVOUR_AUDIT_KEY` 指定路径。
+- 尚未实现：管理 IP 白名单、日志级别开关。
 
 **密钥与 `.env` 永不入库。** 仓库只保留 `.env.example`。
 
@@ -112,8 +106,8 @@ systemctl enable --now devour-authd
 ### 2.5 初始管理员
 
 ```bash
-sudo -u devour /opt/devour-auth/devour-authd admin create --username admin
-# 输出一次性密码与 10 个恢复码，保存后关闭终端
+sudo -u devour /opt/devour-auth/devour-authd init-admin
+# 输出一次性密码与 TOTP 秘钥（otpauth 链接），保存后关闭终端
 ```
 
 不要设置默认密码，不要写进仓库或文档。
@@ -269,6 +263,8 @@ systemctl start devour-authd
 | 审计链断 | 见第 6 节 |
 | 在线数异常高 | 检查是否有伪造心跳；看 `sessions.last_heartbeat` 分布与 IP |
 | 登录被限流误伤 | 检查 nginx `limit_req` 与应用层计数；临时提高阈值需审计 |
+| `certbot` 报 `X509_V_FLAG_NOTIFY_POLICY` / `X509Req` | 系统 pyOpenSSL 与 `/usr/local` 下的 cryptography 版本不匹配。用清华源覆盖安装：`python3 -m pip install -U -i https://pypi.tuna.tsinghua.edu.cn/simple certbot`（当前服务器用的是 `/usr/local/bin/certbot` 5.10.0） |
+| ACME 验证 `secondary validation timeout` | 偶发。确认 `curl http://net.namikao.com/.well-known/acme-challenge/test` 能取到文件后原样重试即可 |
 
 ## 9. 本地开发
 

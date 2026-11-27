@@ -7,8 +7,8 @@
 
 ## 状态
 
-服务端 I1 完成：卡密/卡类型/权限/设备绑定/会话、消耗与暂停、审计哈希链与每日 Ed25519 锚定。
-未开始：管理端与代理端前端、代理体系（I2）、开放 API（I3）。进度见 `docs/design.md` 第 18 节。
+服务端 I1 完成并已部署在 `https://net.namikao.com`（systemd + nginx + Let's Encrypt）。
+未开始：代理体系（I2）、开放 API（I3）、运营端（I4）。进度见 `docs/design.md` 第 18 节。
 
 ## 技术栈
 
