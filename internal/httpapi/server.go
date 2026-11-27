@@ -118,6 +118,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /agent/api/cards", s.requireAgent(s.agentCards))
 	mux.HandleFunc("GET /agent/api/ledger", s.requireAgent(s.agentLedger))
 	mux.HandleFunc("GET /agent/api/bills", s.requireAgent(s.agentBills))
+	mux.HandleFunc("GET /agent/api/subagents", s.requireAgent(s.agentSubagents))
 
 	// 运营内容
 	mux.HandleFunc("GET /admin/api/releases", s.requireAdmin(s.listReleases))
@@ -156,6 +157,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /v1/pause", s.clientPause)
 
 	mux.HandleFunc("POST /v1/query", s.clientQuery)
+	mux.HandleFunc("POST /v1/query/unbind", s.clientQueryUnbind)
 
 	// 未匹配路径：API 前缀返回 JSON 错误，其余交给前端路由。
 	mux.HandleFunc("GET /", s.spa)

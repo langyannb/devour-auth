@@ -264,6 +264,25 @@ func (s *Server) agentCards(w http.ResponseWriter, r *http.Request) {
 	writeData(w, map[string]any{"items": out, "total": total})
 }
 
+// agentSubagents 代理可见的下级列表（含自己）。
+func (s *Server) agentSubagents(w http.ResponseWriter, r *http.Request) {
+	c := agentFrom(r)
+	ctx := r.Context()
+	subs, err := s.st.ListAgents(ctx, c.Agent.ID)
+	if err != nil {
+		internalErr(w, s.log, "查下级失败", err)
+		return
+	}
+	out := make([]map[string]any, 0, len(subs)+1)
+	me := agentJSON(c.Agent)
+	me["is_self"] = true
+	out = append(out, me)
+	for _, a := range subs {
+		out = append(out, agentJSON(a))
+	}
+	writeData(w, out)
+}
+
 func (s *Server) agentLedger(w http.ResponseWriter, r *http.Request) {
 	c := agentFrom(r)
 	rows, total, err := s.st.ListAgentLedger(r.Context(), c.Agent.ID,

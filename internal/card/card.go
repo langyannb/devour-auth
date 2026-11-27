@@ -378,6 +378,59 @@ func (s *Service) ResetRebind(ctx context.Context, id int64, ch StatusChange) er
 	})
 }
 
+// SelfUnbind 终端用户自助解绑：受策略的免费次数限制，超出需联系客服。
+func (s *Service) SelfUnbind(ctx context.Context, id int64, ch StatusChange) error {
+	now := s.now().Unix()
+	tx, err := s.st.DB().BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	c, err := s.st.CardTx(ctx, tx, id)
+	if err != nil {
+		return err
+	}
+	if c.Status == store.CardBanned || c.Status == store.CardRecycled {
+		return fmt.Errorf("%w: 卡密不可用", ErrState)
+	}
+	var snap Snapshot
+	if err := json.Unmarshal([]byte(c.SnapshotJSON), &snap); err != nil {
+		return err
+	}
+	if snap.RebindFree <= 0 || c.RebindUsed >= snap.RebindFree {
+		return fmt.Errorf("%w: 免费换绑次数已用完，请联系客服", ErrState)
+	}
+	n, err := s.st.CountBoundDevicesTx(ctx, tx, id)
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return fmt.Errorf("%w: 没有已绑定的设备", ErrState)
+	}
+
+	before := cardAudit(c)
+	if _, err := s.st.UnbindDevices(ctx, tx, id, now); err != nil {
+		return err
+	}
+	c.RebindUsed++
+	if err := s.st.UpdateCardTx(ctx, tx, c); err != nil {
+		return err
+	}
+	if err := audit.Append(ctx, tx, audit.Entry{
+		TS:     now,
+		Actor:  ch.Actor,
+		Action: ch.Action,
+		Target: fmt.Sprintf("card:%d", id),
+		Before: before,
+		After:  cardAudit(c),
+		IP:     ch.IP,
+	}); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
 // mutate 读卡、改字段、写回，并在同一事务里落审计。
 func (s *Service) mutate(ctx context.Context, id int64, ch StatusChange, fn func(c *store.Card, now int64) error) error {
 	now := s.now().Unix()

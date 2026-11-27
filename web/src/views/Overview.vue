@@ -95,8 +95,8 @@ onMounted(load)
     </n-space>
 
     <n-card title="最近 14 天" size="small" style="margin-bottom: 16px">
-      <div v-if="trend.length === 0" style="color: #888; padding: 12px 0">
-        还没有历史数据（每天 00:07 自动汇总，也可手动 `rollup` 某天）。
+      <div v-if="trend.length < 2" style="color: #888; padding: 12px 0">
+        历史数据不足（每天 00:07 汇总一次，明天起才有趋势）。今天：登录 {{ trend[0]?.logins ?? 0 }} 次、新增激活 {{ trend[0]?.activations ?? 0 }} 张。
       </div>
       <template v-else>
         <div class="spark-label">

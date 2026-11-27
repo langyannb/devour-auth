@@ -18,7 +18,9 @@ interface QueryResult {
 const kami = ref('')
 const result = ref<QueryResult | null>(null)
 const err = ref('')
+const notice = ref('')
 const busy = ref(false)
+const unbinding = ref(false)
 
 const statusType = computed(() => {
   switch (result.value?.status) {
@@ -47,6 +49,7 @@ const balance = computed(() => {
 async function query() {
   err.value = ''
   result.value = null
+  notice.value = ''
   if (!kami.value.trim()) {
     err.value = '请输入卡密'
     return
@@ -68,6 +71,32 @@ async function query() {
     err.value = '网络错误，请稍后再试'
   } finally {
     busy.value = false
+  }
+}
+
+// 自助解绑：只走策略里的免费次数，超出提示联系客服
+async function unbind() {
+  if (!result.value) return
+  err.value = ''
+  notice.value = ''
+  unbinding.value = true
+  try {
+    const res = await fetch('/v1/query/unbind', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ kami: kami.value.trim() }),
+    })
+    const body = await res.json()
+    if (!body.ok) {
+      err.value = body.message ?? '解绑失败'
+      return
+    }
+    notice.value = '已解绑全部设备，下次登录会重新绑定当前设备'
+    await query()
+  } catch {
+    err.value = '网络错误，请稍后再试'
+  } finally {
+    unbinding.value = false
   }
 }
 </script>
@@ -95,6 +124,7 @@ async function query() {
       </div>
 
       <n-alert v-if="err" type="error" style="margin-top: 16px">{{ err }}</n-alert>
+      <n-alert v-if="notice" type="success" style="margin-top: 16px">{{ notice }}</n-alert>
 
       <n-card v-if="result" style="margin-top: 20px">
         <div class="row">
@@ -120,6 +150,13 @@ async function query() {
         <div v-if="result.paused" class="row">
           <span class="label">计时</span>
           <span style="color: #d97706">已暂停</span>
+        </div>
+
+        <div v-if="result.bound_devices > 0" style="margin-top: 16px">
+          <n-button size="small" :loading="unbinding" @click="unbind">解绑全部设备</n-button>
+          <span style="margin-left: 10px; font-size: 12px; color: #8b93a7">
+            受卡类型的免费换绑次数限制
+          </span>
         </div>
       </n-card>
 

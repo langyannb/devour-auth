@@ -9,6 +9,7 @@ import (
 
 	"github.com/langyannb/devour-auth/internal/apierr"
 	"github.com/langyannb/devour-auth/internal/audit"
+	"github.com/langyannb/devour-auth/internal/card"
 	"github.com/langyannb/devour-auth/internal/clientauth"
 )
 
@@ -331,6 +332,45 @@ func (s *Server) clientQuery(w http.ResponseWriter, r *http.Request) {
 		"bound_devices":     bound,
 		"server_time":       s.now().Unix(),
 	})
+}
+
+// clientQueryUnbind 终端用户自助解绑：受策略的免费换绑次数限制。
+func (s *Server) clientQueryUnbind(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Kami string `json:"kami"`
+	}
+	if !decode(w, r, &req) {
+		return
+	}
+	if strings.TrimSpace(req.Kami) == "" {
+		writeErr(w, http.StatusBadRequest, CodeBadInput, "请输入卡密")
+		return
+	}
+	ip := clientIP(r)
+	if !s.lim.Allow("query:unbind:"+ip, 5, time.Minute) {
+		writeErr(w, http.StatusTooManyRequests, CodeRateLimited, "操作过于频繁")
+		return
+	}
+	ctx := r.Context()
+	c, err := s.st.CardByKami(ctx, strings.TrimSpace(req.Kami))
+	if err != nil {
+		writeErr(w, http.StatusNotFound, CodeCardNotFound, "卡密不存在")
+		return
+	}
+	err = s.cards.SelfUnbind(ctx, c.ID, card.StatusChange{
+		Action: "card.self_unbind",
+		Actor:  "user:query",
+		IP:     ip,
+	})
+	if err != nil {
+		if errors.Is(err, card.ErrState) {
+			writeErr(w, http.StatusConflict, CodeBadInput, err.Error())
+			return
+		}
+		internalErr(w, s.log, "自助解绑失败", err)
+		return
+	}
+	writeData(w, map[string]any{"unbound": true})
 }
 
 func (s *Server) clientSession(w http.ResponseWriter, r *http.Request) {
