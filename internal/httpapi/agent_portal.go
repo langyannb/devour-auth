@@ -30,7 +30,7 @@ func (s *Server) agentSummary(w http.ResponseWriter, r *http.Request) {
 	}
 	cardCount, _ := s.st.CountCardsByAgents(ctx, ids)
 	online, _ := s.st.CountSessionsByAgents(ctx, ids, now.Unix())
-	subs, _ := s.st.ListAgents(ctx, c.Agent.ID)
+	subs, _ := s.st.ListAgents(ctx, c.Agent.AppID, c.Agent.ID)
 
 	writeData(w, map[string]any{
 		"name":             c.Agent.Name,

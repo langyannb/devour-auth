@@ -335,17 +335,17 @@ func TestRefreshRotationAndReuse(t *testing.T) {
 func TestConcurrentLimitEvictsOldest(t *testing.T) {
 	h := setup(t)
 	p := h.makePolicy(t, store.Policy{Code: "c", Name: "c", Kind: store.KindForever,
-		DeviceLimit: 5, ConcurrentLimit: 1})
+		DeviceLimit: 1, ConcurrentLimit: 1})
 	kami := h.issue(t, p.ID)
 
 	a, err := h.login(kami, "fp-1")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := h.login(kami, "fp-2"); err != nil {
+	// 同一设备重连：会话数超过并发上限（= 设备上限），旧会话被挤掉
+	if _, err := h.login(kami, "fp-1"); err != nil {
 		t.Fatal(err)
 	}
-	// 旧会话被挤掉
 	if _, err := h.svc.Status(context.Background(), a.AccessToken, "1.2.3.4", "ua"); err == nil {
 		t.Fatal("最旧会话应被吊销")
 	} else if codeOf(t, err) != apierr.Revoked {

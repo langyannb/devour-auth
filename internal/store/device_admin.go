@@ -3,12 +3,16 @@ package store
 import "context"
 
 // ListDevices 设备列表，可按卡或指纹筛选。
-func (s *Store) ListDevices(ctx context.Context, cardID int64, fingerprint string, includeUnbound bool, limit, offset int) ([]Device, int64, error) {
+func (s *Store) ListDevices(ctx context.Context, cardID, appID int64, fingerprint string, includeUnbound bool, limit, offset int) ([]Device, int64, error) {
 	where := " WHERE 1=1"
 	var args []any
 	if cardID > 0 {
 		where += " AND card_id = ?"
 		args = append(args, cardID)
+	}
+	if appID > 0 {
+		where += " AND card_id IN (SELECT id FROM cards WHERE app_id = ?)"
+		args = append(args, appID)
 	}
 	if fingerprint != "" {
 		where += " AND fingerprint LIKE ?"
@@ -82,15 +86,15 @@ type SessionRow struct {
 	CreatedAt     int64
 }
 
-func (s *Store) ListSessions(ctx context.Context, now int64, limit, offset int) ([]SessionRow, int64, error) {
-	return s.listSessions(ctx, true, now, 0, limit, offset)
+func (s *Store) ListSessions(ctx context.Context, appID, now int64, limit, offset int) ([]SessionRow, int64, error) {
+	return s.listSessions(ctx, true, now, 0, appID, limit, offset)
 }
 
 func (s *Store) ListSessionsByCard(ctx context.Context, cardID int64, limit, offset int) ([]SessionRow, int64, error) {
-	return s.listSessions(ctx, false, 0, cardID, limit, offset)
+	return s.listSessions(ctx, false, 0, cardID, 0, limit, offset)
 }
 
-func (s *Store) listSessions(ctx context.Context, onlineOnly bool, now int64, cardID int64, limit, offset int) ([]SessionRow, int64, error) {
+func (s *Store) listSessions(ctx context.Context, onlineOnly bool, now int64, cardID, appID int64, limit, offset int) ([]SessionRow, int64, error) {
 	where := " WHERE 1=1"
 	var args []any
 	if onlineOnly {
@@ -100,6 +104,10 @@ func (s *Store) listSessions(ctx context.Context, onlineOnly bool, now int64, ca
 	if cardID > 0 {
 		where += " AND se.card_id = ?"
 		args = append(args, cardID)
+	}
+	if appID > 0 {
+		where += " AND se.card_id IN (SELECT id FROM cards WHERE app_id = ?)"
+		args = append(args, appID)
 	}
 
 	var total int64

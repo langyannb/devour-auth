@@ -494,7 +494,8 @@ BEGIN SELECT RAISE(ABORT, 'audit_log is append-only'); END;
 
 ### 10.3 验证开关
 
-- `verify_device=1`（默认）：限制设备数量；关掉后不校验上限。
+- `verify_device=1`（默认）：限制设备数量，同时在线数上限 = 设备上限（`device_limit`）；
+  关掉后不校验设备数量，同时在线也不限。
 - `verify_ip=1`（默认关）：换 /24 网段登录时写一条 `ip_anomaly` 事件，只记录不拦登录。
 - 单卡覆盖：`cards.verify_device=0` 时这张卡不校验设备数量（设备仍绑定、仍用于会话），
   优先级高于全局开关；在卡密详情页切换。

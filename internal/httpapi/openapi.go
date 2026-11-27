@@ -34,6 +34,16 @@ func openKeyFrom(r *http.Request) store.APIKey {
 	return r.Context().Value(openKeyCtxKey{}).(store.APIKey)
 }
 
+// openCard 按卡密取卡，并确认属于当前密钥的应用（跨应用一律当不存在）。
+func (s *Server) openCard(w http.ResponseWriter, r *http.Request, kami string) (store.Card, bool) {
+	c, err := s.st.CardByKami(r.Context(), strings.TrimSpace(kami))
+	if err != nil || c.AppID != openKeyFrom(r).AppID {
+		writeErr(w, http.StatusNotFound, apierr.CardNotFound, "卡密不存在")
+		return store.Card{}, false
+	}
+	return c, true
+}
+
 func hasScope(scopes, want string) bool {
 	for _, s := range strings.Split(scopes, ",") {
 		if strings.TrimSpace(s) == want {
@@ -132,6 +142,10 @@ func (s *Server) openGenerate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	k := openKeyFrom(r)
+	if p.AppID != k.AppID {
+		writeErr(w, http.StatusNotFound, apierr.BadInput, "卡类型不存在")
+		return
+	}
 	res, err := s.cards.Generate(ctx, card.GenerateReq{
 		AppID: p.AppID, PolicyID: p.ID, Qty: req.Qty, Prefix: req.Prefix,
 		CreatedBy: 0,
@@ -153,9 +167,8 @@ func (s *Server) openQuery(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &req) {
 		return
 	}
-	c, err := s.st.CardByKami(r.Context(), strings.TrimSpace(req.Kami))
-	if err != nil {
-		writeErr(w, http.StatusNotFound, apierr.CardNotFound, "卡密不存在")
+	c, ok := s.openCard(w, r, req.Kami)
+	if !ok {
 		return
 	}
 	writeData(w, cardJSON(c))
@@ -173,13 +186,12 @@ func (s *Server) openExtend(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ctx := r.Context()
-	c, err := s.st.CardByKami(ctx, strings.TrimSpace(req.Kami))
-	if err != nil {
-		writeErr(w, http.StatusNotFound, apierr.CardNotFound, "卡密不存在")
+	c, ok := s.openCard(w, r, req.Kami)
+	if !ok {
 		return
 	}
 	k := openKeyFrom(r)
-	err = s.cards.Extend(ctx, c.ID, card.ExtendAdd{
+	err := s.cards.Extend(ctx, c.ID, card.ExtendAdd{
 		Days: req.Days, Times: req.Times, Points: req.Points, Seconds: req.Seconds,
 	}, card.StatusChange{
 		Action: "card.extend",
@@ -201,9 +213,8 @@ func (s *Server) openUnbind(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ctx := r.Context()
-	c, err := s.st.CardByKami(ctx, strings.TrimSpace(req.Kami))
-	if err != nil {
-		writeErr(w, http.StatusNotFound, apierr.CardNotFound, "卡密不存在")
+	c, ok := s.openCard(w, r, req.Kami)
+	if !ok {
 		return
 	}
 	k := openKeyFrom(r)
@@ -239,9 +250,8 @@ func (s *Server) openGrant(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback()
 
-	c, err := s.st.CardByKami(ctx, strings.TrimSpace(req.Kami))
-	if err != nil {
-		writeErr(w, http.StatusNotFound, apierr.CardNotFound, "卡密不存在")
+	c, ok := s.openCard(w, r, req.Kami)
+	if !ok {
 		return
 	}
 	ent, err := s.st.EntitlementByCodeTx(ctx, tx, c.AppID, req.Code)
@@ -273,7 +283,7 @@ func (s *Server) openGrant(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) openOnline(w http.ResponseWriter, r *http.Request) {
-	n, err := s.st.ActiveSessionCount(r.Context(), s.now().Unix())
+	n, err := s.st.ActiveSessionCountApp(r.Context(), s.now().Unix(), openKeyFrom(r).AppID)
 	if err != nil {
 		internalErr(w, s.log, "查在线数失败", err)
 		return
@@ -284,7 +294,12 @@ func (s *Server) openOnline(w http.ResponseWriter, r *http.Request) {
 // ---------- 管理端密钥 ----------
 
 func (s *Server) listAPIKeys(w http.ResponseWriter, r *http.Request) {
-	list, err := s.st.ListAPIKeys(r.Context())
+	app, err := s.appFromQuery(r)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, CodeBadInput, "应用不存在")
+		return
+	}
+	list, err := s.st.ListAPIKeys(r.Context(), app.ID)
 	if err != nil {
 		internalErr(w, s.log, "查密钥失败", err)
 		return
@@ -305,6 +320,11 @@ func (s *Server) listAPIKeys(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) createAPIKey(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	app, err := s.appFromQuery(r)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, CodeBadInput, "应用不存在")
+		return
+	}
 	var req struct {
 		Name   string `json:"name"`
 		Scopes string `json:"scopes"`
@@ -339,7 +359,7 @@ func (s *Server) createAPIKey(w http.ResponseWriter, r *http.Request) {
 	secret := base64.RawURLEncoding.EncodeToString(secretRaw)
 
 	id, err := s.st.CreateAPIKey(ctx, store.APIKey{
-		Name: req.Name, Scopes: req.Scopes, KeyID: keyID, Secret: secret,
+		AppID: app.ID, Name: req.Name, Scopes: req.Scopes, KeyID: keyID, Secret: secret,
 		Status: "active", CreatedAt: s.now().Unix(),
 	})
 	if err != nil {

@@ -162,7 +162,7 @@ func (s *Server) agentMe(w http.ResponseWriter, r *http.Request) {
 		internalErr(w, s.log, "查可见范围失败", err)
 		return
 	}
-	subs, err := s.st.ListAgents(ctx, c.Agent.ID)
+	subs, err := s.st.ListAgents(ctx, c.Agent.AppID, c.Agent.ID)
 	if err != nil {
 		internalErr(w, s.log, "查下级失败", err)
 		return
@@ -274,6 +274,10 @@ func (s *Server) agentIssue(w http.ResponseWriter, r *http.Request) {
 			writeErr(w, http.StatusBadRequest, CodeBadInput, "应用不存在")
 			return
 		}
+		if app.ID != c.Agent.AppID {
+			writeErr(w, http.StatusBadRequest, CodeBadInput, "该代理不属于这个应用")
+			return
+		}
 		res, err := s.agents.IssueByPlan(r.Context(), agent.PlanIssueReq{
 			AgentID: c.Agent.ID, AppID: app.ID,
 			Kind: req.Kind, Multiplier: req.Multiplier, Value: req.Value, Unit: req.Unit,
@@ -294,6 +298,10 @@ func (s *Server) agentIssue(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if p, err := s.st.PolicyByID(r.Context(), req.PolicyID); err != nil || p.AppID != c.Agent.AppID {
+		writeErr(w, http.StatusBadRequest, CodeBadInput, "卡类型不存在")
+		return
+	}
 	res, err := s.agents.Issue(r.Context(), agent.IssueReq{
 		AgentID:  c.Agent.ID,
 		PolicyID: req.PolicyID,
@@ -348,7 +356,7 @@ func (s *Server) agentCards(w http.ResponseWriter, r *http.Request) {
 func (s *Server) agentSubagents(w http.ResponseWriter, r *http.Request) {
 	c := agentFrom(r)
 	ctx := r.Context()
-	subs, err := s.st.ListAgents(ctx, c.Agent.ID)
+	subs, err := s.st.ListAgents(ctx, c.Agent.AppID, c.Agent.ID)
 	if err != nil {
 		internalErr(w, s.log, "查下级失败", err)
 		return
@@ -426,7 +434,12 @@ func agentJSON(a store.Agent) map[string]any {
 // ---------- 管理员侧 ----------
 
 func (s *Server) listAgents(w http.ResponseWriter, r *http.Request) {
-	list, err := s.st.ListAgents(r.Context(), queryInt64(r, "parent_id"))
+	app, err := s.appFromQuery(r)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, CodeBadInput, "应用不存在")
+		return
+	}
+	list, err := s.st.ListAgents(r.Context(), app.ID, queryInt64(r, "parent_id"))
 	if err != nil {
 		internalErr(w, s.log, "查代理失败", err)
 		return
@@ -449,6 +462,11 @@ type createAgentReq struct {
 
 func (s *Server) createAgent(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	app, err := s.appFromQuery(r)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, CodeBadInput, "应用不存在")
+		return
+	}
 	var req createAgentReq
 	if !decode(w, r, &req) {
 		return
@@ -467,7 +485,7 @@ func (s *Server) createAgent(w http.ResponseWriter, r *http.Request) {
 	}
 
 	a := store.Agent{
-		Name: req.Name, Level: 1, DiscountBP: req.DiscountBP,
+		AppID: app.ID, Name: req.Name, Level: 1, DiscountBP: req.DiscountBP,
 		RebateBP:          req.RebateBP,
 		MonthlyQuotaCents: req.MonthlyQuotaCents,
 		QuotaCents:        req.MonthlyQuotaCents,
@@ -475,7 +493,7 @@ func (s *Server) createAgent(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.ParentID > 0 {
 		parent, err := s.st.AgentByID(ctx, req.ParentID)
-		if err != nil {
+		if err != nil || parent.AppID != app.ID {
 			writeErr(w, http.StatusBadRequest, CodeBadInput, "上级代理不存在")
 			return
 		}

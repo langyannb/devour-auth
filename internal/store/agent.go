@@ -4,10 +4,12 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strings"
 )
 
 type Agent struct {
 	ID                int64
+	AppID             int64
 	Name              string
 	ParentID          sql.NullInt64
 	Level             int64
@@ -22,22 +24,22 @@ type Agent struct {
 	FrozenAt          sql.NullInt64
 }
 
-const agentCols = `id, name, parent_id, level, discount_bp, rebate_bp, monthly_quota_cents, quota_cents,
+const agentCols = `id, app_id, name, parent_id, level, discount_bp, rebate_bp, monthly_quota_cents, quota_cents,
   pass_hash, COALESCE(totp_secret,''), status, created_at, frozen_at`
 
 func scanAgent(sc interface{ Scan(...any) error }) (Agent, error) {
 	var a Agent
-	err := sc.Scan(&a.ID, &a.Name, &a.ParentID, &a.Level, &a.DiscountBP, &a.RebateBP,
+	err := sc.Scan(&a.ID, &a.AppID, &a.Name, &a.ParentID, &a.Level, &a.DiscountBP, &a.RebateBP,
 		&a.MonthlyQuotaCents, &a.QuotaCents, &a.PassHash, &a.TotpSecret, &a.Status, &a.CreatedAt, &a.FrozenAt)
 	return a, err
 }
 
 func (s *Store) CreateAgent(ctx context.Context, a Agent) (int64, error) {
 	res, err := s.db.ExecContext(ctx,
-		`INSERT INTO agents(name, parent_id, level, discount_bp, rebate_bp, monthly_quota_cents, quota_cents,
+		`INSERT INTO agents(app_id, name, parent_id, level, discount_bp, rebate_bp, monthly_quota_cents, quota_cents,
 		   pass_hash, totp_secret, status, created_at)
-		 VALUES(?,?,?,?,?,?,?,?,NULLIF(?, ''),?,?)`,
-		a.Name, a.ParentID, a.Level, a.DiscountBP, a.RebateBP, a.MonthlyQuotaCents, a.QuotaCents,
+		 VALUES(?,?,?,?,?,?,?,?,?,NULLIF(?, ''),?,?)`,
+		a.AppID, a.Name, a.ParentID, a.Level, a.DiscountBP, a.RebateBP, a.MonthlyQuotaCents, a.QuotaCents,
 		a.PassHash, a.TotpSecret, a.Status, a.CreatedAt)
 	if err != nil {
 		if isUniqueViolation(err) {
@@ -66,13 +68,23 @@ func (s *Store) AgentByName(ctx context.Context, name string) (Agent, error) {
 	return a, err
 }
 
-// ListAgents 返回全部代理；parentID 传 0 表示不按父级过滤。
-func (s *Store) ListAgents(ctx context.Context, parentID int64) ([]Agent, error) {
+// ListAgents 返回代理；appID 传 0 表示不按应用过滤，parentID 传 0 表示不按父级过滤。
+func (s *Store) ListAgents(ctx context.Context, appID, parentID int64) ([]Agent, error) {
 	q := `SELECT ` + agentCols + ` FROM agents`
-	var args []any
+	var (
+		args  []any
+		where []string
+	)
+	if appID > 0 {
+		where = append(where, "app_id = ?")
+		args = append(args, appID)
+	}
 	if parentID > 0 {
-		q += ` WHERE parent_id = ?`
+		where = append(where, "parent_id = ?")
 		args = append(args, parentID)
+	}
+	if len(where) > 0 {
+		q += " WHERE " + strings.Join(where, " AND ")
 	}
 	q += ` ORDER BY id`
 	rows, err := s.db.QueryContext(ctx, q, args...)
