@@ -378,7 +378,7 @@ func (s *Service) ResetRebind(ctx context.Context, id int64, ch StatusChange) er
 	})
 }
 
-// SelfUnbind 终端用户自助解绑：受策略的免费次数限制，超出需联系客服。
+// SelfUnbind 终端用户自助解绑：受策略的免费次数、冷却天数与扣时规则限制。
 func (s *Service) SelfUnbind(ctx context.Context, id int64, ch StatusChange) error {
 	now := s.now().Unix()
 	tx, err := s.st.DB().BeginTx(ctx, nil)
@@ -398,9 +398,16 @@ func (s *Service) SelfUnbind(ctx context.Context, id int64, ch StatusChange) err
 	if err := json.Unmarshal([]byte(c.SnapshotJSON), &snap); err != nil {
 		return err
 	}
-	if snap.RebindFree <= 0 || c.RebindUsed >= snap.RebindFree {
-		return fmt.Errorf("%w: 免费换绑次数已用完，请联系客服", ErrState)
+
+	// 冷却：距上次换绑不足策略天数时不允许
+	if snap.RebindCooldownDays > 0 && c.RebindAt > 0 {
+		next := c.RebindAt + snap.RebindCooldownDays*86400
+		if now < next {
+			return fmt.Errorf("%w: 换绑冷却中，%s 后可再换",
+				ErrState, time.Unix(next, 0).Format("2006-01-02"))
+		}
 	}
+
 	n, err := s.st.CountBoundDevicesTx(ctx, tx, id)
 	if err != nil {
 		return err
@@ -410,10 +417,37 @@ func (s *Service) SelfUnbind(ctx context.Context, id int64, ch StatusChange) err
 	}
 
 	before := cardAudit(c)
+
+	if c.RebindUsed < snap.RebindFree {
+		// 免费次数内
+		c.RebindUsed++
+	} else {
+		// 超出免费次数：按 rebind_cost_hours 扣时
+		if snap.RebindCostHours <= 0 {
+			return fmt.Errorf("%w: 免费换绑次数已用完，请联系客服", ErrState)
+		}
+		cost := snap.RebindCostHours * 3600
+		switch c.Kind {
+		case store.KindTimed:
+			if c.RemainingSeconds < cost {
+				return fmt.Errorf("%w: 剩余时长不足 %d 小时", ErrState, snap.RebindCostHours)
+			}
+			c.RemainingSeconds -= cost
+		case store.KindDuration, store.KindTrial:
+			if c.ExpireAt == 0 || c.ExpireAt-cost <= now {
+				return fmt.Errorf("%w: 剩余有效期不足 %d 小时", ErrState, snap.RebindCostHours)
+			}
+			c.ExpireAt -= cost
+		default:
+			return fmt.Errorf("%w: 该卡类型不支持扣时换绑，请联系客服", ErrState)
+		}
+		c.RebindUsed++
+	}
+	c.RebindAt = now
+
 	if _, err := s.st.UnbindDevices(ctx, tx, id, now); err != nil {
 		return err
 	}
-	c.RebindUsed++
 	if err := s.st.UpdateCardTx(ctx, tx, c); err != nil {
 		return err
 	}

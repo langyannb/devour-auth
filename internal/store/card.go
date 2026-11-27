@@ -33,6 +33,7 @@ type Card struct {
 	RemainingSeconds int64
 	Paused           int64
 	RebindUsed       int64
+	RebindAt         int64
 	SnapshotJSON     string
 	Note             string
 	ActivatedAt      sql.NullInt64
@@ -42,14 +43,14 @@ type Card struct {
 
 const cardCols = `id, app_id, kami, policy_id, kind, status, batch_id, agent_id,
   device_limit, expire_at, remain_times, points, remaining_seconds,
-  paused, rebind_used, snapshot_json, COALESCE(note,''), activated_at, banned_at, created_at`
+  paused, rebind_used, rebind_at, snapshot_json, COALESCE(note,''), activated_at, banned_at, created_at`
 
 func scanCard(sc interface{ Scan(...any) error }) (Card, error) {
 	var c Card
 	err := sc.Scan(
 		&c.ID, &c.AppID, &c.Kami, &c.PolicyID, &c.Kind, &c.Status, &c.BatchID, &c.AgentID,
 		&c.DeviceLimit, &c.ExpireAt, &c.RemainTimes, &c.Points, &c.RemainingSeconds,
-		&c.Paused, &c.RebindUsed, &c.SnapshotJSON, &c.Note, &c.ActivatedAt, &c.BannedAt, &c.CreatedAt,
+		&c.Paused, &c.RebindUsed, &c.RebindAt, &c.SnapshotJSON, &c.Note, &c.ActivatedAt, &c.BannedAt, &c.CreatedAt,
 	)
 	return c, err
 }
@@ -82,10 +83,10 @@ func (s *Store) InsertCard(ctx context.Context, tx *sql.Tx, c Card) (int64, erro
 func updateCard(ctx context.Context, ex Executor, c Card) error {
 	_, err := ex.ExecContext(ctx,
 		`UPDATE cards SET status=?, device_limit=?, expire_at=?, remain_times=?, points=?,
-		   remaining_seconds=?, paused=?, rebind_used=?, note=?, activated_at=?, banned_at=?
+		   remaining_seconds=?, paused=?, rebind_used=?, rebind_at=?, note=?, activated_at=?, banned_at=?
 		 WHERE id = ?`,
 		c.Status, c.DeviceLimit, c.ExpireAt, c.RemainTimes, c.Points,
-		c.RemainingSeconds, c.Paused, c.RebindUsed, c.Note, c.ActivatedAt, c.BannedAt, c.ID)
+		c.RemainingSeconds, c.Paused, c.RebindUsed, c.RebindAt, c.Note, c.ActivatedAt, c.BannedAt, c.ID)
 	return err
 }
 
