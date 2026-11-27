@@ -1,7 +1,9 @@
 package httpapi
 
 import (
+	"crypto/rand"
 	"encoding/csv"
+	"encoding/hex"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -18,16 +20,32 @@ func (s *Server) agentCreateSub(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
-		Name       string `json:"name"`
-		Password   string `json:"password"`
-		DiscountBP int64  `json:"discount_bp"`
+		Name     string `json:"name"`
+		Password string `json:"password"`
 	}
 	if !decode(w, r, &req) {
 		return
 	}
-	if req.Name == "" || len(req.Password) < auth.MinPasswordLen {
-		writeErr(w, http.StatusBadRequest, CodeBadInput, "代理名必填，密码至少 12 位")
+	if req.Name == "" {
+		writeErr(w, http.StatusBadRequest, CodeBadInput, "代理名必填")
 		return
+	}
+	passwordSet := int64(0)
+	if req.Password != "" {
+		if len(req.Password) < auth.MinPasswordLen {
+			writeErr(w, http.StatusBadRequest, CodeBadInput,
+				fmt.Sprintf("密码至少 %d 位，或者留空让下级通过链接自己设置", auth.MinPasswordLen))
+			return
+		}
+		passwordSet = 1
+	} else {
+		// 占位密码：下级通过专属链接设置真正的密码
+		rnd := make([]byte, 32)
+		if _, err := rand.Read(rnd); err != nil {
+			internalErr(w, s.log, "生成密码失败", err)
+			return
+		}
+		req.Password = hex.EncodeToString(rnd)
 	}
 	// 折扣模型已废弃（价格由模板决定），这里只保留字段兼容
 	hash, err := auth.HashPassword(req.Password)
@@ -35,10 +53,16 @@ func (s *Server) agentCreateSub(w http.ResponseWriter, r *http.Request) {
 		internalErr(w, s.log, "哈希失败", err)
 		return
 	}
+	slug, err := newAgentSlug()
+	if err != nil {
+		internalErr(w, s.log, "生成链接失败", err)
+		return
+	}
 	id, err := s.st.CreateAgent(r.Context(), store.Agent{
 		AppID: c.Agent.AppID, Name: req.Name, ParentID: store.NullInt64(c.Agent.ID), Level: 2,
 		DiscountBP: 10000, RebateBP: 0, QuotaCents: 0,
 		PassHash: hash, Status: "active", CreatedAt: s.now().Unix(),
+		LoginSlug: slug, PasswordSet: passwordSet,
 	})
 	if err == store.ErrConflict {
 		writeErr(w, http.StatusConflict, CodeBadInput, "代理名已存在")
@@ -51,8 +75,12 @@ func (s *Server) agentCreateSub(w http.ResponseWriter, r *http.Request) {
 	_ = s.writeAudit(r.Context(), adminCtx{
 		Admin: store.Admin{ID: c.Agent.ID, Username: c.Agent.Name, Role: "agent"},
 	}, "agent.create_sub", fmt.Sprintf("agent:%d", id), "",
-		fmt.Sprintf(`{"name":%q,"discount_bp":%d}`, req.Name, req.DiscountBP), clientIP(r))
-	writeData(w, map[string]any{"id": id, "name": req.Name, "level": 2, "discount_bp": req.DiscountBP})
+		fmt.Sprintf(`{"name":%q}`, req.Name), clientIP(r))
+	writeData(w, map[string]any{
+		"id": id, "name": req.Name, "level": 2,
+		"login_link": s.agentInviteLink(slug),
+		"activated":  passwordSet == 1,
+	})
 }
 
 // agentChangePassword 代理改自己的密码。

@@ -22,25 +22,28 @@ type Agent struct {
 	Status            string // active | frozen
 	CreatedAt         int64
 	FrozenAt          sql.NullInt64
+	LoginSlug         string // 专属登录链接的路径段，空=没有
+	PasswordSet       int64  // 0 = 等下级通过链接设置密码
 }
 
 const agentCols = `id, app_id, name, parent_id, level, discount_bp, rebate_bp, monthly_quota_cents, quota_cents,
-  pass_hash, COALESCE(totp_secret,''), status, created_at, frozen_at`
+  pass_hash, COALESCE(totp_secret,''), status, created_at, frozen_at, COALESCE(login_slug,''), password_set`
 
 func scanAgent(sc interface{ Scan(...any) error }) (Agent, error) {
 	var a Agent
 	err := sc.Scan(&a.ID, &a.AppID, &a.Name, &a.ParentID, &a.Level, &a.DiscountBP, &a.RebateBP,
-		&a.MonthlyQuotaCents, &a.QuotaCents, &a.PassHash, &a.TotpSecret, &a.Status, &a.CreatedAt, &a.FrozenAt)
+		&a.MonthlyQuotaCents, &a.QuotaCents, &a.PassHash, &a.TotpSecret, &a.Status, &a.CreatedAt, &a.FrozenAt,
+		&a.LoginSlug, &a.PasswordSet)
 	return a, err
 }
 
 func (s *Store) CreateAgent(ctx context.Context, a Agent) (int64, error) {
 	res, err := s.db.ExecContext(ctx,
 		`INSERT INTO agents(app_id, name, parent_id, level, discount_bp, rebate_bp, monthly_quota_cents, quota_cents,
-		   pass_hash, totp_secret, status, created_at)
-		 VALUES(?,?,?,?,?,?,?,?,?,NULLIF(?, ''),?,?)`,
+		   pass_hash, totp_secret, status, created_at, login_slug, password_set)
+		 VALUES(?,?,?,?,?,?,?,?,?,NULLIF(?, ''),?,?,?,?)`,
 		a.AppID, a.Name, a.ParentID, a.Level, a.DiscountBP, a.RebateBP, a.MonthlyQuotaCents, a.QuotaCents,
-		a.PassHash, a.TotpSecret, a.Status, a.CreatedAt)
+		a.PassHash, a.TotpSecret, a.Status, a.CreatedAt, nullIfEmpty(a.LoginSlug), a.PasswordSet)
 	if err != nil {
 		if isUniqueViolation(err) {
 			return 0, ErrConflict
@@ -319,4 +322,39 @@ func (s *Store) RevokeOtherAgentSessions(ctx context.Context, agentID, keepID, n
 		`UPDATE agent_sessions SET revoked_at = ?
 		  WHERE agent_id = ? AND id != ? AND revoked_at IS NULL`, now, agentID, keepID)
 	return err
+}
+
+func nullIfEmpty(s string) any {
+	if s == "" {
+		return nil
+	}
+	return s
+}
+
+// AgentBySlug 按专属链接标识找代理。
+func (s *Store) AgentBySlug(ctx context.Context, slug string) (Agent, error) {
+	a, err := scanAgent(s.db.QueryRowContext(ctx,
+		`SELECT `+agentCols+` FROM agents WHERE login_slug = ?`, slug))
+	if errors.Is(err, sql.ErrNoRows) {
+		return Agent{}, ErrNotFound
+	}
+	return a, err
+}
+
+// ActivateAgentBySlug 下级通过专属链接首次设置密码；已设置过返回 ErrConflict。
+func (s *Store) ActivateAgentBySlug(ctx context.Context, slug, passHash string) error {
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE agents SET pass_hash = ?, password_set = 1 WHERE login_slug = ? AND password_set = 0`,
+		passHash, slug)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return ErrConflict
+	}
+	return nil
 }
