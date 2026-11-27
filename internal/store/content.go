@@ -152,3 +152,21 @@ func (s *Store) SetFlag(ctx context.Context, appID int64, key, value string, now
 		appID, key, value, now)
 	return err
 }
+
+// ListFlagsTx 事务内读应用开关，避免和单连接事务互等。
+func (s *Store) ListFlagsTx(ctx context.Context, tx *sql.Tx, appID int64) (map[string]string, error) {
+	rows, err := tx.QueryContext(ctx, `SELECT key, value FROM flags WHERE app_id = ? ORDER BY key`, appID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]string{}
+	for rows.Next() {
+		var k, v string
+		if err := rows.Scan(&k, &v); err != nil {
+			return nil, err
+		}
+		out[k] = v
+	}
+	return out, rows.Err()
+}

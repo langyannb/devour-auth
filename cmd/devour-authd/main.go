@@ -109,6 +109,7 @@ func run() error {
 			AdminHost:  cfg.AdminHost,
 			AgentHost:  cfg.AgentHost,
 			NetHost:    cfg.NetHost,
+			UnbindHost: cfg.UnbindHost,
 			BackupDir:  cfg.BackupDir,
 			DBPath:     cfg.DBPath,
 			ListenAddr: cfg.ListenAddr,

@@ -1,10 +1,11 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import { agentAuthed, authed, tryRestore, tryRestoreAgent } from './api'
 
-// 子域决定端：admin.* → 管理端，agent.* → 代理端，其余 → 官网/查卡。
-// 本地开发用 ?role=agent 切到代理端。
+// 子域决定端：admin.* → 管理端，agent.* → 代理端，unbind.* → 终端自解绑页，
+// 其余 → 官网/查卡。本地开发用 ?role=agent 切到代理端。
 const host = location.hostname
 const forced = new URLSearchParams(location.search).get('role')
+const isUnbind = host.startsWith('unbind.')
 const isAgent = host.startsWith('agent.') || forced === 'agent'
 const isAdmin = host.startsWith('admin.') || forced === 'admin' ||
   host === 'localhost' || host === '127.0.0.1' || host === ''
@@ -64,12 +65,19 @@ const publicRoutes: RouteRecordRaw[] = [
   { path: '/query', component: () => import('./views/public/Query.vue') },
 ]
 
+// 解绑页单独一个域，只挂这一条路由，任何其它路径回首页。
+const unbindRoutes: RouteRecordRaw[] = [
+  { path: '/', component: () => import('./views/public/Unbind.vue') },
+  { path: '/:pathMatch(.*)*', redirect: '/' },
+]
+
 const router = createRouter({
   history: createWebHistory(),
-  routes: isAgent ? agentRoutes : isAdmin ? adminRoutes : publicRoutes,
+  routes: isUnbind ? unbindRoutes : isAgent ? agentRoutes : isAdmin ? adminRoutes : publicRoutes,
 })
 
 router.beforeEach(async (to) => {
+  if (isUnbind) return true // 解绑页免登录
   if (!isAgent && !isAdmin) return true // 官网与查卡页免登录
 
   if (isAgent) {

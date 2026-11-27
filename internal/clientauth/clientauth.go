@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"sort"
 	"sync"
 	"time"
@@ -162,9 +163,25 @@ func (s *Service) Login(ctx context.Context, req LoginReq, ip, ua string) (Sessi
 		snap.ConcurrentLimit = 1
 	}
 
-	devID, err := s.bindDevice(ctx, tx, &row, snap, req, now.Unix())
+	// 管理员开关：设备验证关掉就跳过设备数量上限；IP 验证只记录异常，不拦登录。
+	flags, err := s.st.ListFlagsTx(ctx, tx, row.AppID)
 	if err != nil {
 		return SessionView{}, err
+	}
+	verifyDevice := flags["verify_device"] != "0"
+	verifyIP := flags["verify_ip"] == "1"
+
+	devID, err := s.bindDevice(ctx, tx, &row, snap, req, now.Unix(), verifyDevice)
+	if err != nil {
+		return SessionView{}, err
+	}
+	if verifyIP && ip != "" {
+		if last, _ := s.st.LastSessionIPByCardTx(ctx, tx, row.ID); last != "" && !sameSlash24(last, ip) {
+			_ = s.st.InsertEventTx(ctx, tx, store.Event{
+				TS: now.Unix(), Kind: "ip_anomaly", CardID: row.ID, DeviceID: devID,
+				IP: ip, Code: "IP_CHANGED", Detail: "上次登录 " + last,
+			})
+		}
 	}
 
 	// 时长卡 / 试用卡：首次登录开始计时
@@ -276,7 +293,7 @@ func (s *Service) Login(ctx context.Context, req LoginReq, ip, ua string) (Sessi
 	return view, nil
 }
 
-func (s *Service) bindDevice(ctx context.Context, tx *sql.Tx, row *store.Card, snap card.Snapshot, req LoginReq, now int64) (int64, error) {
+func (s *Service) bindDevice(ctx context.Context, tx *sql.Tx, row *store.Card, snap card.Snapshot, req LoginReq, now int64, enforceLimit bool) (int64, error) {
 	dev, err := s.st.BoundDeviceTx(ctx, tx, row.ID, req.Fingerprint)
 	if err == nil {
 		if dev.Banned == 1 {
@@ -294,7 +311,7 @@ func (s *Service) bindDevice(ctx context.Context, tx *sql.Tx, row *store.Card, s
 	if err != nil {
 		return 0, err
 	}
-	if n >= snap.DeviceLimit {
+	if enforceLimit && n >= snap.DeviceLimit {
 		return 0, apierr.New(apierr.DeviceLimit, "设备数量已达上限（%d）", snap.DeviceLimit)
 	}
 	return s.st.InsertDeviceTx(ctx, tx, store.Device{
@@ -839,4 +856,25 @@ func entViews(es []store.Entitlement) []EntitlementView {
 		out = append(out, EntitlementView{Code: e.Code, CostPoints: e.CostPoints, CostTimes: e.CostTimes})
 	}
 	return out
+}
+
+// sameSlash24 判断两个 IP 是否同网段：IPv4 看 /24，IPv6 看 /48；解析失败按不同处理。
+func sameSlash24(a, b string) bool {
+	ia, ib := net.ParseIP(a), net.ParseIP(b)
+	if ia == nil || ib == nil {
+		return a == b
+	}
+	if v4a, v4b := ia.To4(), ib.To4(); v4a != nil && v4b != nil {
+		return v4a[0] == v4b[0] && v4a[1] == v4b[1] && v4a[2] == v4b[2]
+	}
+	v6a, v6b := ia.To16(), ib.To16()
+	if v6a == nil || v6b == nil {
+		return false
+	}
+	for i := 0; i < 6; i++ {
+		if v6a[i] != v6b[i] {
+			return false
+		}
+	}
+	return true
 }

@@ -326,7 +326,24 @@ func (s *Server) clientQuery(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	snap := clientauth.SnapshotOf(c)
-	writeData(w, map[string]any{
+	flags, _ := s.st.ListFlags(r.Context(), c.AppID)
+	us := s.unbindSettings(flags, snap)
+
+	devices := make([]map[string]any, 0, bound)
+	if list, err := s.st.ListBoundDevices(r.Context(), c.ID); err == nil {
+		for _, d := range list {
+			devices = append(devices, map[string]any{
+				"id": d.ID, "fingerprint": maskFingerprint(d.Fingerprint),
+				"model": d.Model, "brand": d.Brand, "os": d.OS,
+				"first_seen": d.FirstSeen, "last_seen": d.LastSeen,
+			})
+		}
+	}
+	freeLeft := us.Free - c.RebindUsed
+	if freeLeft < 0 {
+		freeLeft = 0
+	}
+	out := map[string]any{
 		"status":            c.Status,
 		"kind":              c.Kind,
 		"duration_seconds":  snap.TotalSeconds(),
@@ -337,14 +354,32 @@ func (s *Server) clientQuery(w http.ResponseWriter, r *http.Request) {
 		"paused":            c.Paused == 1,
 		"device_limit":      snap.DeviceLimit,
 		"bound_devices":     bound,
-		"server_time":       s.now().Unix(),
-	})
+		"devices":           devices,
+		"unbind": map[string]any{
+			"free_left": freeLeft, "free_total": us.Free,
+			"cooldown_days": us.CooldownDays, "cost_hours": us.CostHours,
+			"mode": map[bool]string{true: "reject", false: "charge"}[us.RejectPaid],
+			"next_at": func() int64 {
+				if us.CooldownDays > 0 && c.RebindAt > 0 {
+					return c.RebindAt + us.CooldownDays*86400
+				}
+				return 0
+			}(),
+		},
+		"server_time": s.now().Unix(),
+	}
+	if s.ticketKey != nil {
+		out["unbind_ticket"] = s.signUnbindTicket(c.ID)
+	}
+	writeData(w, out)
 }
 
-// clientQueryUnbind 终端用户自助解绑：受策略的免费换绑次数限制。
+// clientQueryUnbind 终端用户自助解绑：查卡拿到的 ticket + 指定设备，扣次/扣时按管理员配置。
 func (s *Server) clientQueryUnbind(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Kami string `json:"kami"`
+		Kami      string  `json:"kami"`
+		Ticket    string  `json:"ticket"`
+		DeviceIDs []int64 `json:"device_ids"`
 	}
 	if !decode(w, r, &req) {
 		return
@@ -364,10 +399,23 @@ func (s *Server) clientQueryUnbind(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusNotFound, CodeCardNotFound, "卡密不存在")
 		return
 	}
-	err = s.cards.SelfUnbind(ctx, c.ID, card.StatusChange{
+	ticketCard, ok := s.verifyUnbindTicket(req.Ticket)
+	if !ok || ticketCard != c.ID {
+		writeErr(w, http.StatusBadRequest, CodeBadInput, "查询已过期，请重新查询")
+		return
+	}
+
+	snap := clientauth.SnapshotOf(c)
+	flags, _ := s.st.ListFlags(ctx, c.AppID)
+	us := s.unbindSettings(flags, snap)
+	free, cd, ch := us.Free, us.CooldownDays, us.CostHours
+	unbound, charged, err := s.cards.SelfUnbindWith(ctx, c.ID, card.StatusChange{
 		Action: "card.self_unbind",
 		Actor:  "user:query",
 		IP:     ip,
+	}, card.SelfUnbindReq{
+		Free: &free, CooldownDays: &cd, CostHours: &ch,
+		RejectPaid: us.RejectPaid, DeviceIDs: req.DeviceIDs,
 	})
 	if err != nil {
 		if errors.Is(err, card.ErrState) {
@@ -377,7 +425,9 @@ func (s *Server) clientQueryUnbind(w http.ResponseWriter, r *http.Request) {
 		internalErr(w, s.log, "自助解绑失败", err)
 		return
 	}
-	writeData(w, map[string]any{"unbound": true})
+	writeData(w, map[string]any{
+		"unbound": unbound, "charged_hours": charged,
+	})
 }
 
 func (s *Server) clientSession(w http.ResponseWriter, r *http.Request) {

@@ -344,3 +344,17 @@ func (s *Store) EntitlementsByCodesTx(ctx context.Context, tx *sql.Tx, appID int
 func isUniqueViolation(err error) bool {
 	return err != nil && strings.Contains(err.Error(), "UNIQUE constraint failed")
 }
+
+// LastSessionIPByCardTx 该卡最近一次会话的 IP，用于换 IP 异常记录。
+func (s *Store) LastSessionIPByCardTx(ctx context.Context, tx *sql.Tx, cardID int64) (string, error) {
+	var ip sql.NullString
+	err := tx.QueryRowContext(ctx,
+		`SELECT ip FROM sessions WHERE card_id = ? ORDER BY id DESC LIMIT 1`, cardID).Scan(&ip)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", nil
+		}
+		return "", err
+	}
+	return ip.String, nil
+}

@@ -65,12 +65,10 @@ func runSeed(cfg config.Config) error {
 	}
 
 	specs := []store.Policy{
-		{Code: "day30", Name: "30 天卡", Kind: store.KindDuration, DurationDays: 30, PriceCents: 990},
+		{Code: "day1", Name: "天卡", Kind: store.KindDuration, DurationDays: 1, PriceCents: 300},
+		{Code: "week1", Name: "周卡", Kind: store.KindDuration, DurationDays: 7, PriceCents: 1500},
+		{Code: "month1", Name: "月卡", Kind: store.KindDuration, DurationDays: 30, PriceCents: 2500},
 		{Code: "forever", Name: "永久卡", Kind: store.KindForever, PriceCents: 9990},
-		{Code: "times10", Name: "10 次卡", Kind: store.KindCount, InitialTimes: 10, PriceCents: 490},
-		{Code: "credit500", Name: "500 点卡", Kind: store.KindCredit, InitialPoints: 500, PriceCents: 1990},
-		{Code: "timed2h", Name: "2 小时计时卡", Kind: store.KindTimed, DurationHours: 2, PriceCents: 290},
-		{Code: "trial1d", Name: "1 天试用卡", Kind: store.KindTrial, DurationDays: 1, TrialPerDevice: 1},
 	}
 
 	cards := card.New(st)
