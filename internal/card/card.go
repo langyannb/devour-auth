@@ -577,6 +577,12 @@ func (s *Service) mutate(ctx context.Context, id int64, ch StatusChange, fn func
 	}); err != nil {
 		return err
 	}
+	if strings.HasPrefix(ch.Action, "card.") {
+		s.notify(ctx, c.AppID, ch.Action, map[string]any{
+			"id": c.ID, "status": c.Status, "device_limit": c.DeviceLimit,
+			"expire_at": c.ExpireAt, "points": c.Points, "remain_times": c.RemainTimes,
+		})
+	}
 	return tx.Commit()
 }
 
