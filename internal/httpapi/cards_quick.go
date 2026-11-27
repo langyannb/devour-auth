@@ -1,9 +1,11 @@
 package httpapi
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 
+	"github.com/langyannb/devour-auth/internal/apierr"
 	"github.com/langyannb/devour-auth/internal/card"
 	"github.com/langyannb/devour-auth/internal/store"
 )
@@ -44,11 +46,27 @@ func unitSeconds(unit string) int64 {
 }
 
 func (s *Server) quickGenerate(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
 	var req quickReq
 	if !decode(w, r, &req) {
 		return
 	}
+	app, err := s.appFromQuery(r)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, CodeBadInput, "应用不存在")
+		return
+	}
+	c := adminFrom(r)
+	out, err := s.quickIssue(r.Context(), app.ID, c.Admin.ID,
+		fmt.Sprintf("%s:%d", c.Admin.Role, c.Admin.ID), clientIP(r), req)
+	if err != nil {
+		s.writeAPIError(w, err)
+		return
+	}
+	writeData(w, out)
+}
+
+// quickIssue 发卡页和开放接口共用：按类型+倍数算时长，再批量生成。
+func (s *Server) quickIssue(ctx context.Context, appID, createdBy int64, actor, ip string, req quickReq) (map[string]any, error) {
 	if req.Qty <= 0 {
 		req.Qty = 1
 	}
@@ -62,14 +80,7 @@ func (s *Server) quickGenerate(w http.ResponseWriter, r *http.Request) {
 		req.Multiplier = 1
 	}
 	if req.Multiplier > 10000 {
-		writeErr(w, http.StatusBadRequest, CodeBadInput, "单码卡密倍数过大")
-		return
-	}
-
-	app, err := s.appFromQuery(r)
-	if err != nil {
-		writeErr(w, http.StatusBadRequest, CodeBadInput, "应用不存在")
-		return
+		return nil, apierr.New(apierr.BadInput, "单码卡密倍数过大")
 	}
 
 	var (
@@ -91,36 +102,31 @@ func (s *Server) quickGenerate(w http.ResponseWriter, r *http.Request) {
 		}
 		duration = v * unitSeconds(req.Unit) * req.Multiplier
 	default:
-		writeErr(w, http.StatusBadRequest, CodeBadInput, "类型需为 day/week/month/forever/custom")
-		return
+		return nil, apierr.New(apierr.BadInput, "类型需为 day/week/month/forever/custom")
 	}
 
-	tpl, err := s.st.EnsureQuickPolicy(ctx, app.ID, policyKind, s.now().Unix())
+	tpl, err := s.st.EnsureQuickPolicy(ctx, appID, policyKind, s.now().Unix())
 	if err != nil {
-		internalErr(w, s.log, "准备模板策略失败", err)
-		return
+		return nil, err
 	}
-
-	c := adminFrom(r)
 	res, err := s.cards.Generate(ctx, card.GenerateReq{
-		AppID:           app.ID,
+		AppID:           appID,
 		PolicyID:        tpl.ID,
 		Qty:             req.Qty,
 		Prefix:          req.Prefix,
 		KamiLength:      req.Length,
 		DurationSeconds: duration,
 		DeviceLimit:     req.DeviceLimit,
-		CreatedBy:       c.Admin.ID,
-		Actor:           fmt.Sprintf("%s:%d", c.Admin.Role, c.Admin.ID),
-		IP:              clientIP(r),
+		CreatedBy:       createdBy,
+		Actor:           actor,
+		IP:              ip,
 		Note:            req.Note,
 		Kamis:           req.Kamis,
 	})
 	if err != nil {
-		s.writeAPIError(w, err)
-		return
+		return nil, err
 	}
-	writeData(w, map[string]any{
+	return map[string]any{
 		"batch_id":   res.BatchID,
 		"kamis":      res.Kamis,
 		"qty":        len(res.Kamis),
@@ -128,5 +134,5 @@ func (s *Server) quickGenerate(w http.ResponseWriter, r *http.Request) {
 		"seconds":    duration,
 		"per_card":   duration,
 		"multiplier": req.Multiplier,
-	})
+	}, nil
 }

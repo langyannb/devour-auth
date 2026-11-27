@@ -160,6 +160,21 @@ func (s *Server) openGenerate(w http.ResponseWriter, r *http.Request) {
 	writeData(w, map[string]any{"batch_id": res.BatchID, "kamis": res.Kamis, "qty": len(res.Kamis)})
 }
 
+// openQuick 开放接口发卡：和发卡页一样的入参，不需要 policy_id。
+func (s *Server) openQuick(w http.ResponseWriter, r *http.Request) {
+	var req quickReq
+	if !decode(w, r, &req) {
+		return
+	}
+	k := openKeyFrom(r)
+	out, err := s.quickIssue(r.Context(), k.AppID, 0, "open:"+k.KeyID, clientIP(r), req)
+	if err != nil {
+		s.writeAPIError(w, err)
+		return
+	}
+	writeData(w, out)
+}
+
 func (s *Server) openQuery(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Kami string `json:"kami"`

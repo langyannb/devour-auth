@@ -167,3 +167,30 @@ func TestOpenAPIStatsOnline(t *testing.T) {
 		t.Fatalf("在线数应为 0: %s", body)
 	}
 }
+
+// 开放接口按类型发卡：不需要 policy_id，和发卡页一致。
+func TestOpenAPIQuickIssue(t *testing.T) {
+	e := setup(t)
+	o := newOpenCaller(t, e, "cards:write")
+
+	code, body := o.call(t, http.MethodPost, "/open/v1/cards/quick",
+		`{"kind":"week","qty":2,"multiplier":1,"device_limit":2,"prefix":"FZ"}`)
+	if code != http.StatusOK || !strings.Contains(body, `"qty":2`) {
+		t.Fatalf("开放接口发卡失败: %d %s", code, body)
+	}
+	var n int64
+	if err := e.st.DB().QueryRow(`SELECT COUNT(*) FROM cards WHERE app_id = 1 AND kami LIKE 'FZ-%'`).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	if n != 2 {
+		t.Fatalf("应生成 2 张，实际 %d", n)
+	}
+	// 卡密能在客户端协议里用（同一应用）
+	var kami string
+	_ = e.st.DB().QueryRow(`SELECT kami FROM cards WHERE kami LIKE 'FZ-%' LIMIT 1`).Scan(&kami)
+	loginBody := fmt.Sprintf(`{"app":"devour","kami":%q,"device":{"fingerprint":"open-fp"},"ts":%d,"nonce":"open-quick-nonce-1"}`,
+		kami, time.Now().Unix())
+	if code, body := e.do(t, &http.Client{}, http.MethodPost, "/v1/auth/login", "", "5.9.9.9", loginBody); code != http.StatusOK {
+		t.Fatalf("开放接口发的卡应能登录: %d %s", code, body)
+	}
+}

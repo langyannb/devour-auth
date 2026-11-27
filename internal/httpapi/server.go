@@ -234,6 +234,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /v1/offline-ticket", s.offlineTicket)
 
 	// 开放 API（HMAC 签名）
+	mux.HandleFunc("POST /open/v1/cards/quick", s.requireAPIKey("cards:write", s.openQuick))
 	mux.HandleFunc("POST /open/v1/cards/generate", s.requireAPIKey("cards:write", s.openGenerate))
 	mux.HandleFunc("POST /open/v1/cards/query", s.requireAPIKey("cards:read", s.openQuery))
 	mux.HandleFunc("POST /open/v1/cards/extend", s.requireAPIKey("cards:write", s.openExtend))

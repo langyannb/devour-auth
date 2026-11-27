@@ -15,6 +15,45 @@ servers:
   - url: https://net.namikao.com
 security: []
 paths:
+  /open/v1/cards/quick:
+    post:
+      summary: 按类型批量发卡（推荐）
+      description: 与后台「发卡」页一致，按卡类型 + 倍数算时长，不需要 policy_id。需要 `cards:write`
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kind, qty]
+              properties:
+                kind: { type: string, enum: [day, week, month, forever, custom] }
+                multiplier: { type: integer, minimum: 1, description: 单码倍数，周卡 + 2 = 2 周 }
+                value: { type: integer, description: custom 的数值 }
+                unit: { type: string, enum: [minute, hour, day], description: custom 的单位 }
+                qty: { type: integer, minimum: 1, maximum: 500 }
+                device_limit: { type: integer, minimum: 1 }
+                prefix: { type: string }
+                note: { type: string }
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  data:
+                    type: object
+                    properties:
+                      batch_id: { type: integer }
+                      qty: { type: integer }
+                      seconds: { type: integer, description: 每张卡的时长（秒），永久卡为 0 }
+                      kamis:
+                        type: array
+                        items: { type: string }
+
   /open/v1/cards/generate:
     post:
       summary: 批量发卡
