@@ -98,6 +98,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /admin/api/audit", s.requireAdmin(s.listAudit))
 	mux.HandleFunc("GET /admin/api/audit/verify", s.requireAdmin(s.verifyAuditChain))
 	mux.HandleFunc("GET /admin/api/stats", s.requireAdmin(s.adminStats))
+	mux.HandleFunc("GET /admin/api/stats/trend", s.requireAdmin(s.statsTrend))
 
 	// 代理管理（管理员）
 	mux.HandleFunc("GET /admin/api/agents", s.requireAdmin(s.listAgents))
@@ -179,8 +180,40 @@ func (s *Server) healthz(w http.ResponseWriter, r *http.Request) {
 func (s *Server) withLogging(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
-		next.ServeHTTP(w, r)
-		s.log.Debug("http", "method", r.Method, "path", r.URL.Path,
+		sw := &statusWriter{ResponseWriter: w}
+		next.ServeHTTP(sw, r)
+		status := sw.status
+		if status == 0 {
+			status = http.StatusOK
+		}
+		level := slog.LevelDebug
+		if status >= 500 {
+			level = slog.LevelError
+		} else if status >= 400 {
+			level = slog.LevelInfo
+		}
+		s.log.Log(r.Context(), level, "http",
+			"method", r.Method, "path", r.URL.Path, "status", status,
 			"dur_ms", time.Since(start).Milliseconds())
 	})
+}
+
+// statusWriter 记录实际写出的状态码，便于排查 401/429。
+type statusWriter struct {
+	http.ResponseWriter
+	status int
+}
+
+func (w *statusWriter) WriteHeader(code int) {
+	if w.status == 0 {
+		w.status = code
+	}
+	w.ResponseWriter.WriteHeader(code)
+}
+
+func (w *statusWriter) Write(b []byte) (int, error) {
+	if w.status == 0 {
+		w.status = http.StatusOK
+	}
+	return w.ResponseWriter.Write(b)
 }

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { NAlert, NButton, NCard, NSpace, NTag } from 'naive-ui'
 import { api } from '../api'
 import { formatTs, statusLabels } from '../utils'
@@ -14,7 +14,16 @@ interface Stats {
   server_time: number
 }
 
+interface DailyStat {
+  day: string
+  activations: number
+  logins: number
+  unique_devices: number
+  issued_cents: number
+}
+
 const stats = ref<Stats | null>(null)
+const trend = ref<DailyStat[]>([])
 const err = ref('')
 const loading = ref(false)
 
@@ -22,13 +31,32 @@ async function load() {
   loading.value = true
   err.value = ''
   try {
-    stats.value = await api.get<Stats>('/admin/api/stats')
+    const [s, t] = await Promise.all([
+      api.get<Stats>('/admin/api/stats'),
+      api.get<DailyStat[]>('/admin/api/stats/trend?days=14'),
+    ])
+    stats.value = s
+    trend.value = t
   } catch (e) {
     err.value = (e as Error).message
   } finally {
     loading.value = false
   }
 }
+
+// 迷你折线：14 天登录数与激活数
+function spark(values: number[]): string {
+  if (values.length === 0) return ''
+  const max = Math.max(1, ...values)
+  const step = values.length > 1 ? 300 / (values.length - 1) : 300
+  return values
+    .map((v, i) => `${(i * step).toFixed(1)},${(58 - (v / max) * 52).toFixed(1)}`)
+    .join(' ')
+}
+
+const loginPoints = computed(() => spark(trend.value.map((d) => d.logins)))
+const activationPoints = computed(() => spark(trend.value.map((d) => d.activations)))
+const trendMax = computed(() => Math.max(1, ...trend.value.map((d) => d.logins)))
 
 const pct = (n: number) => {
   const total = stats.value?.cards_total ?? 0
@@ -65,6 +93,28 @@ onMounted(load)
         <div class="v">{{ stats?.activations_day ?? '—' }}</div>
       </n-card>
     </n-space>
+
+    <n-card title="最近 14 天" size="small" style="margin-bottom: 16px">
+      <div v-if="trend.length === 0" style="color: #888; padding: 12px 0">
+        还没有历史数据（每天 00:07 自动汇总，也可手动 `rollup` 某天）。
+      </div>
+      <template v-else>
+        <div class="spark-label">
+          <span>登录次数（峰值 {{ trendMax }}）</span>
+        </div>
+        <svg viewBox="0 0 300 60" preserveAspectRatio="none" class="spark">
+          <polyline :points="loginPoints" fill="none" stroke="#6366f1" stroke-width="2" />
+        </svg>
+        <div class="spark-label" style="margin-top: 12px"><span>新增激活</span></div>
+        <svg viewBox="0 0 300 60" preserveAspectRatio="none" class="spark">
+          <polyline :points="activationPoints" fill="none" stroke="#06b6d4" stroke-width="2" />
+        </svg>
+        <div class="axis">
+          <span>{{ trend[0]?.day }}</span>
+          <span>{{ trend[trend.length - 1]?.day }}</span>
+        </div>
+      </template>
+    </n-card>
 
     <n-card title="卡密状态分布" size="small">
       <div v-if="!stats || stats.cards_total === 0" style="color: #888; padding: 12px 0">
@@ -124,5 +174,22 @@ onMounted(load)
   height: 100%;
   border-radius: 99px;
   background: linear-gradient(90deg, #6366f1, #06b6d4);
+}
+.spark {
+  width: 100%;
+  height: 68px;
+  display: block;
+}
+.spark-label {
+  font-size: 12px;
+  color: #6b7280;
+  margin-bottom: 4px;
+}
+.axis {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #9aa3b2;
+  margin-top: 4px;
 }
 </style>

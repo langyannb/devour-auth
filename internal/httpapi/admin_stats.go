@@ -28,6 +28,21 @@ func (s *Server) adminStats(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// statsTrend 最近 N 天的每日汇总（默认 14 天）。
+func (s *Server) statsTrend(w http.ResponseWriter, r *http.Request) {
+	days := int(queryInt64(r, "days"))
+	if days <= 0 || days > 90 {
+		days = 14
+	}
+	since := s.now().AddDate(0, 0, -(days - 1)).Format("2006-01-02")
+	list, err := s.st.ListDailyStats(r.Context(), since)
+	if err != nil {
+		internalErr(w, s.log, "查趋势失败", err)
+		return
+	}
+	writeData(w, list)
+}
+
 // verifyAuditChain 重算整链并校验每日锚点（后台「校验」按钮）。
 func (s *Server) verifyAuditChain(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()

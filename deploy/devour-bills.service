@@ -1,0 +1,10 @@
+[Unit]
+Description=Devour Auth 月度代理账单
+After=devour-authd.service
+
+[Service]
+Type=oneshot
+User=devour
+Group=devour
+Environment=DEVOUR_DB=/var/lib/devour/app.db
+ExecStart=/opt/devour-auth/devour-authd bills

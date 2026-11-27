@@ -1,0 +1,9 @@
+[Unit]
+Description=每月 1 日生成上月代理账单
+
+[Timer]
+OnCalendar=*-*-01 01:10:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

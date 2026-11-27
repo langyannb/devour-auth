@@ -49,8 +49,14 @@ func main() {
 			name = os.Args[2]
 		}
 		err = runResetAdmin(config.Load(), name)
+	case "rollup":
+		day := ""
+		if len(os.Args) > 2 {
+			day = os.Args[2]
+		}
+		err = runRollup(config.Load(), day)
 	default:
-		fmt.Fprintf(os.Stderr, "用法: %s [serve|init-admin|verify-audit|anchor|seed|bills [YYYY-MM]|reset-admin <新用户名>]\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "用法: %s [serve|init-admin|verify-audit|anchor|seed|bills [YYYY-MM]|reset-admin <新用户名>|rollup [YYYY-MM-DD]]\n", os.Args[0])
 		os.Exit(2)
 	}
 
@@ -91,6 +97,7 @@ func run() error {
 		return err
 	}
 	startAnchoring(ctx, st.DB(), priv, log)
+	startRollup(ctx, st, log)
 
 	srv := &http.Server{
 		Addr: cfg.ListenAddr,

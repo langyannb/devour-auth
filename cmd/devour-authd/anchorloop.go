@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/langyannb/devour-auth/internal/audit"
+	"github.com/langyannb/devour-auth/internal/store"
 )
 
 // startAnchoring 每天 00:05 对刚结束的一天做链尾签名（design.md 16.3）。
@@ -30,6 +31,31 @@ func startAnchoring(ctx context.Context, db *sql.DB, priv ed25519.PrivateKey, lo
 			case ok:
 				log.Info("审计锚定完成", "day", day)
 			}
+		}
+	}()
+}
+
+// startRollup 每天 00:05 汇总前一天的 daily_stats。
+func startRollup(ctx context.Context, st *store.Store, log *slog.Logger) {
+	go func() {
+		for {
+			next := nextAnchorTime(time.Now()).Add(2 * time.Minute)
+			timer := time.NewTimer(time.Until(next))
+			select {
+			case <-ctx.Done():
+				timer.Stop()
+				return
+			case <-timer.C:
+			}
+			day := next.Add(-7 * time.Minute)
+			start := time.Date(day.Year(), day.Month(), day.Day(), 0, 0, 0, 0, day.Location())
+			key := start.Format("2006-01-02")
+			stat, err := st.RollupDay(ctx, key, start.Unix(), start.AddDate(0, 0, 1).Unix())
+			if err != nil {
+				log.Error("统计汇总失败", "day", key, "err", err)
+				continue
+			}
+			log.Info("统计汇总完成", "day", key, "logins", stat.Logins, "activations", stat.Activations)
 		}
 	}()
 }
