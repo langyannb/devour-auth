@@ -24,6 +24,7 @@ const menu = computed<MenuOption[]>(() => [
   { label: '权限', key: '/entitlements' },
   { label: '代理', key: '/agents' },
   { label: '运营', key: '/ops' },
+  { label: '对接', key: '/open' },
   { label: '审计', key: '/audit' },
   { label: '安全', key: '/security' },
   { label: '应用', key: '/apps' },

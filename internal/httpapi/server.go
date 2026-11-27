@@ -16,14 +16,15 @@ import (
 
 // Options 服务端启动参数，集中传避免构造函数参数爆炸。
 type Options struct {
-	Env       string
-	Static    fs.FS
-	TicketKey ed25519.PrivateKey
-	AdminHost string
-	AgentHost string
-	NetHost   string
-	BackupDir string
-	DBPath    string
+	Env        string
+	Static     fs.FS
+	TicketKey  ed25519.PrivateKey
+	AdminHost  string
+	AgentHost  string
+	NetHost    string
+	BackupDir  string
+	DBPath     string
+	ListenAddr string
 }
 
 type Server struct {
@@ -40,6 +41,7 @@ type Server struct {
 	netHost    string
 	backupDir  string
 	dbPath     string
+	listenAddr string
 	lim        *auth.Limiter
 	openNonces *auth.Limiter
 	now        func() time.Time
@@ -60,6 +62,7 @@ func New(st *store.Store, log *slog.Logger, opt Options) *Server {
 		netHost:    opt.NetHost,
 		backupDir:  opt.BackupDir,
 		dbPath:     opt.DBPath,
+		listenAddr: opt.ListenAddr,
 		lim:        auth.NewLimiter(),
 		openNonces: auth.NewLimiter(),
 		now:        time.Now,
@@ -167,6 +170,7 @@ func (s *Server) Handler() http.Handler {
 	// 开放 API 密钥管理
 	mux.HandleFunc("GET /admin/api/open/keys", s.requireAdmin(s.listAPIKeys))
 	mux.HandleFunc("POST /admin/api/open/keys", s.requireAdmin(s.createAPIKey))
+	mux.HandleFunc("POST /admin/api/open/debug", s.requireAdmin(s.openDebug))
 	mux.HandleFunc("POST /admin/api/open/keys/{id}/disable", s.requireAdmin(s.setAPIKeyStatus(false)))
 	mux.HandleFunc("POST /admin/api/open/keys/{id}/enable", s.requireAdmin(s.setAPIKeyStatus(true)))
 
