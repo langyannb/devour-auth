@@ -7,8 +7,8 @@
 
 ## 状态
 
-服务端 I1 完成并已部署在 `https://net.namikao.com`（systemd + nginx + Let's Encrypt）。
-未开始：代理体系（I2）、开放 API（I3）、运营端（I4）。进度见 `docs/design.md` 第 18 节。
+I1 + I2 已完成并部署在 `https://net.namikao.com`：卡密/卡类型/权限/设备/会话、审计链与锚定、
+代理体系（折扣/额度/返点/账单）与代理端。未开始：开放 API（I3）、运营端（I4）。
 
 ## 技术栈
 

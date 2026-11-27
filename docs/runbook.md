@@ -246,6 +246,18 @@ systemctl start devour-authd
 - 断链处理：立即导出当前 audit_log 与 anchor，停止写入，排查是谁有写权限。
 - 私钥单独备份，泄露即轮换。
 
+## 6.1 代理账单
+
+每月 1 日汇总上月出卡流水：
+
+```bash
+sudo -u devour env DEVOUR_DB=/var/lib/devour/app.db \
+  /opt/devour-auth/devour-authd bills          # 不带参数 = 上月
+# 指定月份：... bills 2026-11
+```
+
+生成后账单为 `open`，线下收款后管理员在后台标记 `settled`。已结算账单不会被重跑覆盖。
+
 ## 7. 密钥轮换
 
 | 密钥 | 轮换方式 | 影响 |
