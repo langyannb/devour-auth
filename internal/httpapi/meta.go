@@ -60,9 +60,15 @@ func (s *Server) meta(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// card_mode=free：客户端不校验卡密自行放行；服务端不做特殊处理
+	mode := "paid"
+	if flags["card_mode"] == "free" {
+		mode = "free"
+	}
 	out := map[string]any{
 		"app":           app.Code,
 		"server_time":   s.now().Unix(),
+		"mode":          mode,
 		"maintenance":   flags["maintenance"] == "1",
 		"notices":       noticesJSON(notices),
 		"flags":         flags,

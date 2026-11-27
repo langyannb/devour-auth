@@ -15,7 +15,7 @@ func TestMetaReflectsAdminContent(t *testing.T) {
 	if code != http.StatusOK {
 		t.Fatalf("meta = %d %s", code, body)
 	}
-	if !strings.Contains(body, `"app":"devour"`) || !strings.Contains(body, `"maintenance":false`) {
+	if !strings.Contains(body, `"app":"devour"`) || !strings.Contains(body, `"maintenance":false`) || !strings.Contains(body, `"mode":"paid"`) {
 		t.Fatalf("meta 基础字段不对: %s", body)
 	}
 	if !strings.Contains(body, "ticket_pubkey") {
@@ -70,5 +70,19 @@ func TestOfflineTicketRequiresToken(t *testing.T) {
 	code, _ := e.do(t, &http.Client{}, http.MethodPost, "/v1/offline-ticket", "", "", "")
 	if code != http.StatusUnauthorized {
 		t.Fatalf("无令牌应 401，得到 %d", code)
+	}
+}
+
+// 免费/收费模式：只影响 /v1/meta 下发的 mode，服务端不特殊放行。
+func TestMetaFreeModeFlag(t *testing.T) {
+	e := setup(t)
+	c, csrf := e.login(t, "admin", "9.9.2.1")
+	if code, b := e.do(t, c, http.MethodPut, "/admin/api/flags", csrf, "9.9.2.1",
+		`{"key":"card_mode","value":"free"}`); code != http.StatusOK {
+		t.Fatalf("设模式失败: %d %s", code, b)
+	}
+	_, body := e.do(t, &http.Client{}, http.MethodGet, "/v1/meta", "", "", "")
+	if !strings.Contains(body, `"mode":"free"`) {
+		t.Fatalf("meta 未下发 free: %s", body)
 	}
 }
