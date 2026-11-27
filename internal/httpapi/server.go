@@ -6,34 +6,62 @@ import (
 	"time"
 
 	"github.com/langyannb/devour-auth/internal/auth"
+	"github.com/langyannb/devour-auth/internal/card"
 	"github.com/langyannb/devour-auth/internal/store"
 )
 
 type Server struct {
-	st  *store.Store
-	log *slog.Logger
-	env string
-	lim *auth.Limiter
-	now func() time.Time
+	st    *store.Store
+	cards *card.Service
+	log   *slog.Logger
+	env   string
+	lim   *auth.Limiter
+	now   func() time.Time
 }
 
 func New(st *store.Store, log *slog.Logger, env string) *Server {
 	return &Server{
-		st:  st,
-		log: log,
-		env: env,
-		lim: auth.NewLimiter(),
-		now: time.Now,
+		st:    st,
+		cards: card.New(st),
+		log:   log,
+		env:   env,
+		lim:   auth.NewLimiter(),
+		now:   time.Now,
 	}
 }
 
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", s.healthz)
+
+	// 管理端会话
 	mux.HandleFunc("POST /admin/api/login", s.adminLogin)
 	mux.HandleFunc("POST /admin/api/logout", s.requireAdmin(s.adminLogout))
 	mux.HandleFunc("GET /admin/api/me", s.requireAdmin(s.adminMe))
 	mux.HandleFunc("POST /admin/api/reauth", s.requireAdmin(s.adminReauth))
+
+	// 应用、卡类型、权限（改价/改策略需 reauth）
+	mux.HandleFunc("GET /admin/api/apps", s.requireAdmin(s.listApps))
+	mux.HandleFunc("GET /admin/api/policies", s.requireAdmin(s.listPolicies))
+	mux.HandleFunc("POST /admin/api/policies", s.requireAdmin(s.requireReauth(s.createPolicy)))
+	mux.HandleFunc("PATCH /admin/api/policies/{id}", s.requireAdmin(s.requireReauth(s.updatePolicy)))
+	mux.HandleFunc("GET /admin/api/entitlements", s.requireAdmin(s.listEntitlements))
+	mux.HandleFunc("POST /admin/api/entitlements", s.requireAdmin(s.requireReauth(s.createEntitlement)))
+
+	// 卡密
+	mux.HandleFunc("POST /admin/api/cards/generate", s.requireAdmin(s.generateCards))
+	mux.HandleFunc("GET /admin/api/cards", s.requireAdmin(s.listCards))
+	mux.HandleFunc("GET /admin/api/cards/{id}", s.requireAdmin(s.getCard))
+	mux.HandleFunc("POST /admin/api/cards/{id}/ban", s.requireAdmin(s.cardStatusAction("ban", s.cards.Ban)))
+	mux.HandleFunc("POST /admin/api/cards/{id}/unban", s.requireAdmin(s.cardStatusAction("unban", s.cards.Unban)))
+	mux.HandleFunc("POST /admin/api/cards/{id}/recycle", s.requireAdmin(s.cardStatusAction("recycle", s.cards.Recycle)))
+	mux.HandleFunc("POST /admin/api/cards/{id}/unbind", s.requireAdmin(s.cardStatusAction("unbind", s.cards.Unbind)))
+	mux.HandleFunc("POST /admin/api/cards/{id}/reset-rebind", s.requireAdmin(s.cardStatusAction("reset_rebind", s.cards.ResetRebind)))
+	mux.HandleFunc("POST /admin/api/cards/{id}/extend", s.requireAdmin(s.extendCard))
+
+	// 审计
+	mux.HandleFunc("GET /admin/api/audit", s.requireAdmin(s.listAudit))
+
 	// 未匹配路径也走统一错误体（JSON 端点，不返回 HTML）。
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusNotFound, CodeBadInput, "接口不存在")

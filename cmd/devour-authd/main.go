@@ -61,6 +61,10 @@ func run() error {
 	if err := st.Migrate(ctx); err != nil {
 		return err
 	}
+	// 幂等兜底：老库或空库也要有首个应用。
+	if _, err := st.EnsureApp(ctx, "devour", "Devour", time.Now().Unix()); err != nil {
+		return err
+	}
 
 	srv := &http.Server{
 		Addr:              cfg.ListenAddr,

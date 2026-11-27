@@ -59,6 +59,10 @@ func runInitAdmin(cfg config.Config) error {
 	if _, err := st.CreateAdmin(ctx, cfg.AdminUser, passHash, "admin", secret, time.Now().Unix()); err != nil {
 		return err
 	}
+	// 首个应用：表结构支持多个，当前只有 devour（design.md 第 3 节）。
+	if _, err := st.EnsureApp(ctx, "devour", "Devour", time.Now().Unix()); err != nil {
+		return err
+	}
 
 	tw := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	fmt.Fprintf(tw, "用户名\t%s\n", cfg.AdminUser)
