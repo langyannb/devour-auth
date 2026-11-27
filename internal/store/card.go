@@ -237,3 +237,60 @@ func (s *Store) CountBoundDevices(ctx context.Context, cardID int64) (int64, err
 		`SELECT COUNT(*) FROM devices WHERE card_id = ? AND unbound_at IS NULL`, cardID).Scan(&n)
 	return n, err
 }
+
+// BoundDeviceCounts 一批卡各自绑定的设备数，列表页一次查完。
+func (s *Store) BoundDeviceCounts(ctx context.Context, cardIDs []int64) (map[int64]int64, error) {
+	out := make(map[int64]int64, len(cardIDs))
+	if len(cardIDs) == 0 {
+		return out, nil
+	}
+	q := `SELECT card_id, COUNT(*) FROM devices
+	       WHERE unbound_at IS NULL AND card_id IN (?` + repeatComma(len(cardIDs)-1) + `)
+	       GROUP BY card_id`
+	args := make([]any, len(cardIDs))
+	for i, id := range cardIDs {
+		args[i] = id
+	}
+	rows, err := s.db.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id, n int64
+		if err := rows.Scan(&id, &n); err != nil {
+			return nil, err
+		}
+		out[id] = n
+	}
+	return out, rows.Err()
+}
+
+// OnlineDeviceCounts 一批卡各有多少台设备在线：access token 未过期的会话。
+func (s *Store) OnlineDeviceCounts(ctx context.Context, cardIDs []int64, now int64) (map[int64]int64, error) {
+	out := make(map[int64]int64, len(cardIDs))
+	if len(cardIDs) == 0 {
+		return out, nil
+	}
+	q := `SELECT card_id, COUNT(DISTINCT device_id) FROM sessions
+	       WHERE revoked_at IS NULL AND access_exp > ? AND card_id IN (?` + repeatComma(len(cardIDs)-1) + `)
+	       GROUP BY card_id`
+	args := make([]any, 0, len(cardIDs)+1)
+	args = append(args, now)
+	for _, id := range cardIDs {
+		args = append(args, id)
+	}
+	rows, err := s.db.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id, n int64
+		if err := rows.Scan(&id, &n); err != nil {
+			return nil, err
+		}
+		out[id] = n
+	}
+	return out, rows.Err()
+}

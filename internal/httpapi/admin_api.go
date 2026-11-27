@@ -431,6 +431,33 @@ func (s *Server) generateCards(w http.ResponseWriter, r *http.Request) {
 	writeData(w, map[string]any{"batch_id": res.BatchID, "kamis": res.Kamis, "qty": len(res.Kamis)})
 }
 
+// cardListJSON 列表行：cardJSON 之外补出卡时长、已绑定设备数、在线设备数。
+func (s *Server) cardListJSON(ctx context.Context, cards []store.Card) ([]map[string]any, error) {
+	ids := make([]int64, 0, len(cards))
+	for _, c := range cards {
+		ids = append(ids, c.ID)
+	}
+	devices, err := s.st.BoundDeviceCounts(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	online, err := s.st.OnlineDeviceCounts(ctx, ids, s.now().Unix())
+	if err != nil {
+		return nil, err
+	}
+	out := make([]map[string]any, 0, len(cards))
+	for _, c := range cards {
+		var snap card.Snapshot
+		_ = json.Unmarshal([]byte(c.SnapshotJSON), &snap)
+		m := cardJSON(c)
+		m["duration_seconds"] = snap.TotalSeconds()
+		m["bound_devices"] = devices[c.ID]
+		m["online_devices"] = online[c.ID]
+		out = append(out, m)
+	}
+	return out, nil
+}
+
 func (s *Server) listCards(w http.ResponseWriter, r *http.Request) {
 	cards, total, err := s.st.ListCards(r.Context(), store.CardFilter{
 		AppID:    queryInt64(r, "app_id"),
@@ -444,9 +471,10 @@ func (s *Server) listCards(w http.ResponseWriter, r *http.Request) {
 		internalErr(w, s.log, "查卡失败", err)
 		return
 	}
-	out := make([]map[string]any, 0, len(cards))
-	for _, c := range cards {
-		out = append(out, cardJSON(c))
+	out, err := s.cardListJSON(r.Context(), cards)
+	if err != nil {
+		internalErr(w, s.log, "查卡失败", err)
+		return
 	}
 	writeData(w, map[string]any{"items": out, "total": total})
 }

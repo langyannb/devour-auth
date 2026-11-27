@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { h, onMounted, ref } from 'vue'
+import { computed, h, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   NAlert, NButton, NCard, NDataTable, NDescriptions, NDescriptionsItem,
   NInputNumber, NModal, NSpace, NTag, type DataTableColumns,
 } from 'naive-ui'
 import { api } from '../api'
-import { formatTs, kindLabels, statusLabels } from '../utils'
+import { cardKindLabel, formatExpiry, formatTs, statusLabels } from '../utils'
 
 interface Card {
   id: number
@@ -67,6 +67,13 @@ const loading = ref(false)
 
 const showExtend = ref(false)
 const showLimit = ref(false)
+
+// 出卡时冻结的时长，详情页据此显示「天卡/周卡/月卡」
+const durationSeconds = computed(() => {
+  const s = card.value?.snapshot
+  if (!s) return 0
+  return (s.duration_days ?? 0) * 86400 + (s.duration_hours ?? 0) * 3600 + (s.duration_seconds ?? 0)
+})
 const limitVal = ref(1)
 const ext = ref({ days: 0, points: 0, times: 0, seconds: 0 })
 const busy = ref(false)
@@ -202,8 +209,8 @@ onMounted(load)
 
       <n-descriptions :column="2" label-placement="left" size="small" bordered>
         <n-descriptions-item label="ID">{{ card.id }}</n-descriptions-item>
-        <n-descriptions-item label="类型">{{ kindLabels[card.kind] ?? card.kind }}</n-descriptions-item>
-        <n-descriptions-item label="到期">{{ card.expire_at ? formatTs(card.expire_at) : '永久' }}</n-descriptions-item>
+        <n-descriptions-item label="类型">{{ cardKindLabel(card.kind, durationSeconds) }}</n-descriptions-item>
+        <n-descriptions-item label="到期">{{ formatExpiry(card.kind, card.expire_at, card.remaining_seconds) }}</n-descriptions-item>
         <n-descriptions-item label="余额">
           <span v-if="card.kind === 'credit'">{{ card.points }} 点</span>
           <span v-else-if="card.kind === 'count'">{{ card.remain_times }} 次</span>
