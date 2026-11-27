@@ -22,6 +22,7 @@ type Options struct {
 	AdminHost  string
 	AgentHost  string
 	NetHost    string
+	UnbindHost string
 	BackupDir  string
 	DBPath     string
 	ListenAddr string
@@ -43,6 +44,7 @@ type Server struct {
 	adminHost     string
 	agentHost     string
 	netHost       string
+	unbindHost    string
 	backupDir     string
 	dbPath        string
 	listenAddr    string
@@ -80,6 +82,7 @@ func New(st *store.Store, log *slog.Logger, opt Options) *Server {
 		adminHost:     opt.AdminHost,
 		agentHost:     opt.AgentHost,
 		netHost:       opt.NetHost,
+		unbindHost:    opt.UnbindHost,
 		backupDir:     opt.BackupDir,
 		dbPath:        opt.DBPath,
 		listenAddr:    opt.ListenAddr,

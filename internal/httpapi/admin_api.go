@@ -158,12 +158,9 @@ func isInternalPolicy(code string) bool {
 	return strings.HasPrefix(code, "_quick_")
 }
 
+// 只允许新发时长卡与永久卡；次数/点数/计时/试用已下线（见迁移 011）。
 func validKind(k string) bool {
-	switch k {
-	case store.KindDuration, store.KindForever, store.KindCount, store.KindCredit, store.KindTimed, store.KindTrial:
-		return true
-	}
-	return false
+	return k == store.KindDuration || k == store.KindForever
 }
 
 // resolveEntitlements 把权限 code 列表换成 id，任一缺失即报错。

@@ -16,24 +16,66 @@ const user = sessionStorage.getItem('devour_user') ?? ''
 
 const menu = computed<MenuOption[]>(() => [
   { label: '概览', key: '/dashboard' },
-  { label: '卡密', key: '/cards' },
-  { label: '发卡', key: '/issue' },
-  { label: '设备', key: '/devices' },
-  { label: '在线', key: '/sessions' },
-  { label: '黑名单', key: '/blacklist' },
-  { label: '权限', key: '/entitlements' },
-  { label: '代理', key: '/agents' },
-  { label: '价格模板', key: '/plans' },
-  { label: '财务', key: '/finance' },
-  { label: '运营', key: '/ops' },
-  { label: '对接', key: '/open' },
-  { label: '回调', key: '/webhooks' },
-  { label: '日志', key: '/events' },
-  { label: '审计', key: '/audit' },
-  { label: '安全', key: '/security' },
-  { label: '账号', key: '/accounts' },
-  { label: '应用', key: '/apps' },
-  { label: '设置', key: '/settings' },
+  {
+    type: 'group',
+    key: 'g-cards',
+    label: '卡密',
+    children: [
+      { label: '卡密', key: '/cards' },
+      { label: '发卡', key: '/issue' },
+      { label: '设备', key: '/devices' },
+      { label: '在线', key: '/sessions' },
+      { label: '黑名单', key: '/blacklist' },
+    ],
+  },
+  {
+    type: 'group',
+    key: 'g-content',
+    label: '权限与内容',
+    children: [
+      { label: '权限包', key: '/entitlements' },
+      { label: '应用', key: '/apps' },
+    ],
+  },
+  {
+    type: 'group',
+    key: 'g-agents',
+    label: '代理',
+    children: [
+      { label: '代理', key: '/agents' },
+      { label: '价格模板', key: '/plans' },
+      { label: '财务', key: '/finance' },
+    ],
+  },
+  {
+    type: 'group',
+    key: 'g-integration',
+    label: '对接',
+    children: [
+      { label: '开放接口', key: '/open' },
+      { label: '回调', key: '/webhooks' },
+    ],
+  },
+  {
+    type: 'group',
+    key: 'g-ops',
+    label: '运维',
+    children: [
+      { label: '运营', key: '/ops' },
+      { label: '日志', key: '/events' },
+      { label: '审计', key: '/audit' },
+      { label: '安全', key: '/security' },
+    ],
+  },
+  {
+    type: 'group',
+    key: 'g-system',
+    label: '系统',
+    children: [
+      { label: '账号', key: '/accounts' },
+      { label: '设置', key: '/settings' },
+    ],
+  },
 ])
 
 function onMenu(key: string) {
@@ -135,3 +177,10 @@ onMounted(loadApps)
   </div>
   <ReauthDialog />
 </template>
+
+<style scoped>
+:deep(.n-menu-item-group-title) {
+  color: #8b93a7;
+  font-size: 12px;
+}
+</style>

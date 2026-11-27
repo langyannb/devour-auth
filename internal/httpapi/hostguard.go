@@ -23,6 +23,13 @@ func (s *Server) hostGuard(next http.Handler) http.Handler {
 				notFound(w)
 				return
 			}
+		case s.unbindHost != "" && host == s.unbindHost:
+			// 用户自助解绑页：只开放页面与查卡/解绑接口
+			if !(path == "/" || strings.HasPrefix(path, "/assets/") ||
+				path == "/favicon.ico" || strings.HasPrefix(path, "/v1/query")) {
+				notFound(w)
+				return
+			}
 		case s.isNetHost(host):
 			// 客户端域：只保留客户端协议与静态页
 			if hasAnyPrefix(path, "/admin/", "/agent/") {

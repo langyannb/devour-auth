@@ -294,3 +294,42 @@ func (s *Store) OnlineDeviceCounts(ctx context.Context, cardIDs []int64, now int
 	}
 	return out, rows.Err()
 }
+
+// UnbindDevicesByIDs 解绑指定设备；ids 为空时解绑全部。返回实际解绑数。
+func (s *Store) UnbindDevicesByIDs(ctx context.Context, tx *sql.Tx, cardID int64, ids []int64, now int64) (int64, error) {
+	if len(ids) == 0 {
+		return s.UnbindDevices(ctx, tx, cardID, now)
+	}
+	q := `UPDATE devices SET unbound_at = ? WHERE card_id = ? AND unbound_at IS NULL AND id IN (?` +
+		repeatComma(len(ids)-1) + `)`
+	args := make([]any, 0, len(ids)+2)
+	args = append(args, now, cardID)
+	for _, id := range ids {
+		args = append(args, id)
+	}
+	res, err := tx.ExecContext(ctx, q, args...)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
+// ListBoundDevices 一张卡当前绑定的设备（解绑页用，不含已解绑）。
+func (s *Store) ListBoundDevices(ctx context.Context, cardID int64) ([]Device, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT `+deviceCols+` FROM devices WHERE card_id = ? AND unbound_at IS NULL ORDER BY id`, cardID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Device
+	for rows.Next() {
+		var d Device
+		if err := rows.Scan(&d.ID, &d.CardID, &d.Fingerprint, &d.Model, &d.Brand, &d.OS,
+			&d.AppVersion, &d.FirstSeen, &d.LastSeen, &d.Banned, &d.UnboundAt); err != nil {
+			return nil, err
+		}
+		out = append(out, d)
+	}
+	return out, rows.Err()
+}

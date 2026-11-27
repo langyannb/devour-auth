@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import {
-  NAlert, NButton, NCard, NForm, NFormItem, NInput, NSpace, NTag,
+  NAlert, NButton, NCard, NForm, NFormItem, NInput, NInputNumber, NSelect, NSpace, NSwitch, NTag,
 } from 'naive-ui'
 import QRCode from 'qrcode'
 import { api } from '../api'
@@ -47,6 +47,81 @@ const disableCode = ref('')
 const showDisable = ref(false)
 
 const ops = ref<OpsStatus | null>(null)
+
+// 卡密策略：flags 里全是字符串，这里收成控件形状；保存时只提交改动过的 key
+interface Policy {
+  unbind_free: number | null
+  unbind_cooldown_days: number | null
+  unbind_mode: 'reject' | 'charge'
+  unbind_cost_hours: number | null
+  verify_device: boolean
+  verify_ip: boolean
+}
+
+const policy = ref<Policy>({
+  unbind_free: 0,
+  unbind_cooldown_days: 0,
+  unbind_mode: 'reject',
+  unbind_cost_hours: 0,
+  verify_device: true,
+  verify_ip: false,
+})
+const policyBase = ref<Record<string, string>>({})
+const policyBusy = ref(false)
+
+function num(v: string | undefined): number {
+  const n = Number.parseInt(v ?? '0', 10)
+  return Number.isFinite(n) && n > 0 ? n : 0
+}
+
+function policyValues(): Record<string, string> {
+  const p = policy.value
+  const int = (v: number | null) => String(Math.max(0, Math.floor(v ?? 0)))
+  return {
+    unbind_free: int(p.unbind_free),
+    unbind_cooldown_days: int(p.unbind_cooldown_days),
+    unbind_mode: p.unbind_mode === 'charge' ? 'charge' : 'reject',
+    unbind_cost_hours: int(p.unbind_cost_hours),
+    verify_device: p.verify_device ? '1' : '0',
+    verify_ip: p.verify_ip ? '1' : '0',
+  }
+}
+
+async function loadFlags() {
+  try {
+    const flags = await api.get<Record<string, string>>('/admin/api/flags')
+    policy.value = {
+      unbind_free: num(flags.unbind_free),
+      unbind_cooldown_days: num(flags.unbind_cooldown_days),
+      unbind_mode: flags.unbind_mode === 'charge' ? 'charge' : 'reject',
+      unbind_cost_hours: num(flags.unbind_cost_hours),
+      verify_device: flags.verify_device !== '0',
+      verify_ip: flags.verify_ip === '1',
+    }
+    policyBase.value = policyValues()
+  } catch (e) {
+    err.value = (e as Error).message
+  }
+}
+
+async function savePolicy() {
+  err.value = ''
+  notice.value = ''
+  policyBusy.value = true
+  try {
+    const cur = policyValues()
+    for (const key of Object.keys(cur)) {
+      if (cur[key] === policyBase.value[key]) continue
+      await api.put('/admin/api/flags', { key, value: cur[key] })
+    }
+    policyBase.value = cur
+    notice.value = '已保存'
+  } catch (e) {
+    err.value = (e as Error).message
+  } finally {
+    policyBusy.value = false
+  }
+}
 
 const opsRows = computed(() => {
   const o = ops.value
@@ -137,6 +212,7 @@ async function disable() {
 onMounted(() => {
   void loadMe()
   void loadOps()
+  void loadFlags()
 })
 </script>
 
@@ -150,6 +226,49 @@ onMounted(() => {
         <span>用户名：{{ me.username }}</span>
         <span>角色：{{ me.role }}</span>
       </div>
+    </n-card>
+
+    <n-card title="卡密策略" size="small" style="margin-bottom: 16px">
+      <n-form label-placement="top" :show-feedback="false">
+        <div class="policy-grid">
+          <n-form-item label="免费解绑次数">
+            <n-input-number v-model:value="policy.unbind_free" :min="0" :precision="0" style="width: 100%" />
+          </n-form-item>
+          <n-form-item label="解绑冷却天数">
+            <n-input-number v-model:value="policy.unbind_cooldown_days" :min="0" :precision="0" style="width: 100%" />
+          </n-form-item>
+          <n-form-item label="超出免费次数后">
+            <n-select
+              v-model:value="policy.unbind_mode"
+              :options="[
+                { label: '免费模式（拒绝解绑）', value: 'reject' },
+                { label: '收费模式（扣时长）', value: 'charge' },
+              ]"
+            />
+          </n-form-item>
+          <n-form-item label="收费模式每次扣多少小时">
+            <n-input-number
+              v-model:value="policy.unbind_cost_hours"
+              :min="0"
+              :precision="0"
+              :disabled="policy.unbind_mode === 'reject'"
+              style="width: 100%"
+            />
+          </n-form-item>
+          <n-form-item label="设备验证">
+            <n-switch v-model:value="policy.verify_device" />
+          </n-form-item>
+          <n-form-item label="IP 验证">
+            <n-switch v-model:value="policy.verify_ip" />
+          </n-form-item>
+        </div>
+      </n-form>
+      <p class="policy-hint">
+        解绑扣时对时长卡生效，永久卡不支持。
+        <template v-if="policy.unbind_mode === 'reject'">免费模式下不扣时。</template>
+      </p>
+      <p class="policy-hint">设备验证关闭后不校验设备数量上限；IP 验证开启后换 IP 只记录异常，不拦登录。</p>
+      <n-button type="primary" :loading="policyBusy" @click="savePolicy">保存</n-button>
     </n-card>
 
     <n-card title="定时任务" size="small" style="margin-bottom: 16px">
@@ -226,6 +345,16 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.policy-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px 16px;
+}
+.policy-hint {
+  margin: 0 0 8px;
+  color: #8b93a7;
+  font-size: 12px;
+}
 .ops-table {
   overflow-x: auto;
 }

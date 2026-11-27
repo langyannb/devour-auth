@@ -12,6 +12,7 @@ type Config struct {
 	AdminHost    string // DEVOUR_ADMIN_HOST，管理端子域
 	AgentHost    string // DEVOUR_AGENT_HOST，代理端子域
 	NetHost      string // DEVOUR_NET_HOST，客户端域
+	UnbindHost   string // DEVOUR_UNBIND_HOST，用户自助解绑页
 	BackupDir    string // DEVOUR_BACKUP_DIR，备份目录（安全体检用）
 }
 
@@ -25,6 +26,7 @@ func Load() Config {
 		AdminHost:    envOr("DEVOUR_ADMIN_HOST", "admin.namikao.com"),
 		AgentHost:    envOr("DEVOUR_AGENT_HOST", "agent.namikao.com"),
 		NetHost:      envOr("DEVOUR_NET_HOST", "net.namikao.com"),
+		UnbindHost:   envOr("DEVOUR_UNBIND_HOST", "unbind.zhenx.xyz"),
 		BackupDir:    envOr("DEVOUR_BACKUP_DIR", "/var/backups/devour"),
 	}
 }

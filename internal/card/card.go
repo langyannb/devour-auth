@@ -488,77 +488,111 @@ func (s *Service) SetNote(ctx context.Context, id int64, note string, ch StatusC
 }
 
 // SelfUnbind 终端用户自助解绑：受策略的免费次数、冷却天数与扣时规则限制。
+// SelfUnbindReq 解绑参数；空值表示沿用卡快照里的策略。
+type SelfUnbindReq struct {
+	Free         *int64  // 免费次数
+	CooldownDays *int64  // 冷却天数
+	CostHours    *int64  // 超出后扣多少小时（>0 才扣）
+	RejectPaid   bool    // true = 免费模式，超出次数直接拒绝
+	DeviceIDs    []int64 // 空 = 解绑全部
+}
+
+// SelfUnbind 兼容旧调用：按卡快照策略解绑全部设备。
 func (s *Service) SelfUnbind(ctx context.Context, id int64, ch StatusChange) error {
+	_, _, err := s.SelfUnbindWith(ctx, id, ch, SelfUnbindReq{})
+	return err
+}
+
+// SelfUnbindWith 解绑指定设备，返回解绑台数与扣除小时数。
+func (s *Service) SelfUnbindWith(ctx context.Context, id int64, ch StatusChange, req SelfUnbindReq) (int64, int64, error) {
 	now := s.now().Unix()
 	tx, err := s.st.DB().BeginTx(ctx, nil)
 	if err != nil {
-		return err
+		return 0, 0, err
 	}
 	defer tx.Rollback()
 
 	c, err := s.st.CardTx(ctx, tx, id)
 	if err != nil {
-		return err
+		return 0, 0, err
 	}
 	if c.Status == store.CardBanned || c.Status == store.CardRecycled {
-		return fmt.Errorf("%w: 卡密不可用", ErrState)
+		return 0, 0, fmt.Errorf("%w: 卡密不可用", ErrState)
 	}
 	var snap Snapshot
 	if err := json.Unmarshal([]byte(c.SnapshotJSON), &snap); err != nil {
-		return err
+		return 0, 0, err
+	}
+	free := snap.RebindFree
+	if req.Free != nil {
+		free = *req.Free
+	}
+	cooldownDays := snap.RebindCooldownDays
+	if req.CooldownDays != nil {
+		cooldownDays = *req.CooldownDays
+	}
+	costHours := snap.RebindCostHours
+	if req.CostHours != nil {
+		costHours = *req.CostHours
 	}
 
 	// 冷却：距上次换绑不足策略天数时不允许
-	if snap.RebindCooldownDays > 0 && c.RebindAt > 0 {
-		next := c.RebindAt + snap.RebindCooldownDays*86400
+	if cooldownDays > 0 && c.RebindAt > 0 {
+		next := c.RebindAt + cooldownDays*86400
 		if now < next {
-			return fmt.Errorf("%w: 换绑冷却中，%s 后可再换",
+			return 0, 0, fmt.Errorf("%w: 换绑冷却中，%s 后可再换",
 				ErrState, time.Unix(next, 0).Format("2006-01-02"))
 		}
 	}
 
 	n, err := s.st.CountBoundDevicesTx(ctx, tx, id)
 	if err != nil {
-		return err
+		return 0, 0, err
 	}
 	if n == 0 {
-		return fmt.Errorf("%w: 没有已绑定的设备", ErrState)
+		return 0, 0, fmt.Errorf("%w: 没有已绑定的设备", ErrState)
 	}
 
 	before := cardAudit(c)
 
-	if c.RebindUsed < snap.RebindFree {
+	var chargedHours int64
+	if c.RebindUsed < free {
 		// 免费次数内
 		c.RebindUsed++
 	} else {
-		// 超出免费次数：按 rebind_cost_hours 扣时
-		if snap.RebindCostHours <= 0 {
-			return fmt.Errorf("%w: 免费换绑次数已用完，请联系客服", ErrState)
+		// 超出免费次数：免费模式直接拒绝，收费模式按小时扣
+		if req.RejectPaid || costHours <= 0 {
+			return 0, 0, fmt.Errorf("%w: 免费换绑次数已用完，请联系客服", ErrState)
 		}
-		cost := snap.RebindCostHours * 3600
+		cost := costHours * 3600
 		switch c.Kind {
 		case store.KindTimed:
 			if c.RemainingSeconds < cost {
-				return fmt.Errorf("%w: 剩余时长不足 %d 小时", ErrState, snap.RebindCostHours)
+				return 0, 0, fmt.Errorf("%w: 剩余时长不足 %d 小时", ErrState, costHours)
 			}
 			c.RemainingSeconds -= cost
 		case store.KindDuration, store.KindTrial:
 			if c.ExpireAt == 0 || c.ExpireAt-cost <= now {
-				return fmt.Errorf("%w: 剩余有效期不足 %d 小时", ErrState, snap.RebindCostHours)
+				return 0, 0, fmt.Errorf("%w: 剩余有效期不足 %d 小时", ErrState, costHours)
 			}
 			c.ExpireAt -= cost
 		default:
-			return fmt.Errorf("%w: 该卡类型不支持扣时换绑，请联系客服", ErrState)
+			return 0, 0, fmt.Errorf("%w: 该卡类型不支持扣时换绑，请联系客服", ErrState)
 		}
+		chargedHours = costHours
 		c.RebindUsed++
 	}
 	c.RebindAt = now
 
-	if _, err := s.st.UnbindDevices(ctx, tx, id, now); err != nil {
-		return err
+	unbound, err := s.st.UnbindDevicesByIDs(ctx, tx, id, req.DeviceIDs, now)
+	if err != nil {
+		return 0, 0, err
+	}
+	if unbound == 0 {
+		return 0, 0, fmt.Errorf("%w: 设备不存在或已解绑", ErrState)
 	}
 	if err := s.st.UpdateCardTx(ctx, tx, c); err != nil {
-		return err
+		return 0, 0, err
 	}
 	if err := audit.Append(ctx, tx, audit.Entry{
 		TS:     now,
@@ -569,9 +603,9 @@ func (s *Service) SelfUnbind(ctx context.Context, id int64, ch StatusChange) err
 		After:  cardAudit(c),
 		IP:     ch.IP,
 	}); err != nil {
-		return err
+		return 0, 0, err
 	}
-	return tx.Commit()
+	return unbound, chargedHours, tx.Commit()
 }
 
 // mutate 读卡、改字段、写回，并在同一事务里落审计。

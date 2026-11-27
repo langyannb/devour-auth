@@ -14,6 +14,8 @@ interface QueryResult {
   paused: boolean
   device_limit: number
   bound_devices: number
+  devices?: { id: number }[]
+  unbind_ticket?: string
 }
 
 const kami = ref('')
@@ -105,17 +107,23 @@ async function query() {
   }
 }
 
-// 自助解绑：只走策略里的免费次数，超出提示联系客服
+// 整卡换绑：用查询时拿到的 ticket + 全部设备 id，规则由后端按卡类型判定。
 async function unbind() {
   if (!result.value) return
   err.value = ''
   notice.value = ''
+  const ticket = result.value.unbind_ticket
+  const ids = (result.value.devices ?? []).map((d) => d.id)
+  if (!ticket || ids.length === 0) {
+    err.value = ticket ? '没有已绑定的设备' : '暂不支持自助解绑，请联系客服'
+    return
+  }
   unbinding.value = true
   try {
     const res = await fetch('/v1/query/unbind', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ kami: kami.value.trim() }),
+      body: JSON.stringify({ kami: kami.value.trim(), ticket, device_ids: ids }),
     })
     const body = await res.json()
     if (!body.ok) {
@@ -123,8 +131,12 @@ async function unbind() {
       return
     }
     // 解绑已成功；重新查卡需要新验证码，这里直接更新本地结果。
-    if (result.value) result.value.bound_devices = 0
-    notice.value = '已解绑全部设备，下次登录会重新绑定当前设备'
+    const n = body.data?.unbound ?? ids.length
+    if (result.value) {
+      result.value.bound_devices = 0
+      result.value.devices = []
+    }
+    notice.value = `已解绑 ${n} 台设备，下次登录会重新绑定当前设备`
   } catch {
     err.value = '网络错误，请稍后再试'
   } finally {
@@ -212,6 +224,10 @@ async function unbind() {
 
       <p class="foot">
         查询不到或状态异常？联系发放卡密的代理或客服。
+      </p>
+      <p class="foot">
+        需要单独解绑某台设备，请到
+        <a href="https://unbind.zhenx.xyz" target="_blank" rel="noopener">unbind.zhenx.xyz</a>。
       </p>
     </main>
   </div>
@@ -305,6 +321,9 @@ h1 {
   margin-top: 28px;
   font-size: 13px;
   color: #8b93a7;
+}
+.foot a {
+  color: #4f46e5;
 }
 @media (max-width: 640px) {
   .main {
