@@ -8,7 +8,7 @@
 |---|---|
 | 仓库 | 公开，AGPL-3.0 |
 | 形态 | 网络验证服务端 + 管理端 + 代理端，不含客户端 |
-| 语言 | Go 1.23（服务端）、TypeScript（前端） |
+| 语言 | Go 1.26（服务端）、TypeScript（前端） |
 | 数据库 | SQLite WAL；换 Postgres 只改 `internal/store` |
 | 部署 | 单二进制，systemd，nginx TLS |
 | 域名 | `net.namikao.com` |

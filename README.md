@@ -11,7 +11,7 @@
 
 ## 技术栈
 
-- 服务端：Go 1.23，标准库 `net/http`，SQLite（WAL），前端产物 `embed`
+- 服务端：Go 1.26，标准库 `net/http`，SQLite（WAL），前端产物 `embed`
 - 管理端 / 代理端：Vue 3 + TypeScript + Vite + Naive UI + ECharts
 - 部署：单二进制 + systemd + nginx（TLS 终止）
 
