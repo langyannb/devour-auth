@@ -128,8 +128,10 @@ export const agentApi = {
 
 export async function tryRestore(): Promise<boolean> {
   try {
-    const me = await request<{ csrf_token?: string }>('/admin/api/me')
+    const me = await request<{ csrf_token?: string; username?: string; role?: string }>('/admin/api/me')
     if (me?.csrf_token) setCSRF(me.csrf_token)
+    // 新标签页/刷新后 sessionStorage 是空的，用 /me 补回来
+    if (me?.username) sessionStorage.setItem('devour_user', `${me.username} · ${me.role ?? ''}`)
     authed.value = true
     return true
   } catch {
@@ -140,7 +142,8 @@ export async function tryRestore(): Promise<boolean> {
 
 export async function tryRestoreAgent(): Promise<boolean> {
   try {
-    await request('/agent/api/me', {}, 'agent')
+    const me = await request<{ name?: string; level?: number }>('/agent/api/me', {}, 'agent')
+    if (me?.name) sessionStorage.setItem('devour_agent_name', `${me.name} · L${me.level ?? 1}`)
     agentAuthed.value = true
     return true
   } catch {

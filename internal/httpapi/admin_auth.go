@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	adminIdleTimeout = 30 * time.Minute
+	adminIdleTimeout = 4 * time.Hour
 	adminAbsTimeout  = 12 * time.Hour
 	reauthWindow     = 5 * time.Minute
 
@@ -206,7 +206,7 @@ func (s *Server) adminReauth(w http.ResponseWriter, r *http.Request) {
 	writeData(w, map[string]any{"reauth_until": until})
 }
 
-// requireAdmin 校验管理端会话：空闲 30 分钟 / 绝对 12 小时，写请求校验 CSRF。
+// requireAdmin 校验管理端会话：空闲 4 小时 / 绝对 12 小时，写请求校验 CSRF。
 func (s *Server) requireAdmin(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()

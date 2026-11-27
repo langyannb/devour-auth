@@ -15,7 +15,7 @@ import (
 	"github.com/langyannb/devour-auth/internal/store"
 )
 
-const agentIdleTimeout = 30 * time.Minute
+const agentIdleTimeout = 4 * time.Hour
 
 type agentCtx struct {
 	Agent   store.Agent

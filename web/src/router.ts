@@ -86,15 +86,17 @@ router.beforeEach(async (to) => {
   if (isPublic) return true // 官网首页免登录
   if (!isAgent && !isAdmin) return true // 官网与查卡页免登录
 
+  // 已登录还去 /login 就直接进后台，别再让人重填密码
   if (isAgent) {
-    if (to.path === '/login' || to.name === 'agent-invite') return true
-    if (agentAuthed.value) return true
-    return (await tryRestoreAgent()) ? true : '/login'
+    if (to.name === 'agent-invite') return true
+    const ok = agentAuthed.value || (await tryRestoreAgent())
+    if (!ok) return to.path === '/login' ? true : '/login'
+    return to.path === '/login' ? '/cards' : true
   }
 
-  if (to.path === '/login') return true
-  if (authed.value) return true
-  return (await tryRestore()) ? true : '/login'
+  const ok = authed.value || (await tryRestore())
+  if (!ok) return to.path === '/login' ? true : '/login'
+  return to.path === '/login' ? '/cards' : true
 })
 
 export default router
