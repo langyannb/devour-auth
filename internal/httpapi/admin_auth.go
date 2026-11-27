@@ -142,6 +142,7 @@ func (s *Server) adminMe(w http.ResponseWriter, r *http.Request) {
 		"id":           c.Admin.ID,
 		"username":     c.Admin.Username,
 		"role":         c.Admin.Role,
+		"totp_enabled": c.Admin.TotpSecret != "",
 		"reauth_until": c.Session.ReauthUntil,
 		"server_time":  s.now().Unix(),
 	})

@@ -53,6 +53,6 @@ onMounted(load)
 <template>
   <div>
     <n-alert v-if="err" type="error" style="margin-bottom: 12px">{{ err }}</n-alert>
-    <n-data-table :columns="columns" :data="rows" :loading="loading" :bordered="false" size="small" />
+    <n-data-table :columns="columns" :data="rows" :loading="loading" :bordered="false" size="small" :scroll-x="760" />
   </div>
 </template>

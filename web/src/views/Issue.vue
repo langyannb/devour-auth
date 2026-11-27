@@ -3,6 +3,7 @@ import { onMounted, ref } from 'vue'
 import { NAlert, NButton, NCard, NForm, NFormItem, NInputNumber, NInput, NSelect, NSpace, NTag } from 'naive-ui'
 import { api } from '../api'
 import { kindLabels } from '../utils'
+import { useMobile } from '../useMobile'
 
 interface Policy {
   id: number
@@ -14,6 +15,7 @@ interface Policy {
 }
 
 const policies = ref<Policy[]>([])
+const isMobile = useMobile()
 const policyId = ref<number | null>(null)
 const qty = ref(10)
 const prefix = ref('DV')
@@ -71,9 +73,9 @@ onMounted(loadPolicies)
 </script>
 
 <template>
-  <n-card title="发卡" style="max-width: 720px">
+  <n-card title="发卡">
     <n-alert v-if="err" type="error" style="margin-bottom: 12px">{{ err }}</n-alert>
-    <n-form label-placement="left" label-width="90">
+    <n-form :label-placement="isMobile ? 'top' : 'left'" label-width="90">
       <n-form-item label="卡类型">
         <n-select v-model:value="policyId" :options="options()" placeholder="选择卡类型" />
       </n-form-item>

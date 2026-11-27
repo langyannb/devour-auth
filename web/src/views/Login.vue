@@ -39,7 +39,7 @@ async function submit() {
 
 <template>
   <div style="display: flex; align-items: center; justify-content: center; min-height: 100vh; background: #f5f6f8">
-    <n-card title="Devour Auth 管理端" style="width: 360px">
+    <n-card title="Devour Auth 管理端" style="width: min(360px, 92vw)">
       <n-alert v-if="err" type="error" style="margin-bottom: 12px">{{ err }}</n-alert>
       <n-form @keyup.enter="submit">
         <n-form-item label="账号">

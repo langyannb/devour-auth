@@ -42,6 +42,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /admin/api/logout", s.requireAdmin(s.adminLogout))
 	mux.HandleFunc("GET /admin/api/me", s.requireAdmin(s.adminMe))
 	mux.HandleFunc("POST /admin/api/reauth", s.requireAdmin(s.adminReauth))
+	mux.HandleFunc("POST /admin/api/me/totp/setup", s.requireAdmin(s.adminTOTPSetup))
+	mux.HandleFunc("POST /admin/api/me/totp/enable", s.requireAdmin(s.adminTOTPEnable))
+	mux.HandleFunc("POST /admin/api/me/totp/disable", s.requireAdmin(s.adminTOTPDisable))
 
 	// 应用、卡类型、权限（改价/改策略需 reauth）
 	mux.HandleFunc("GET /admin/api/apps", s.requireAdmin(s.listApps))

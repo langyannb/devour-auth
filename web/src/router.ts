@@ -14,6 +14,7 @@ const router = createRouter({
         { path: 'issue', component: () => import('./views/Issue.vue') },
         { path: 'policies', component: () => import('./views/Policies.vue') },
         { path: 'audit', component: () => import('./views/Audit.vue') },
+        { path: 'settings', component: () => import('./views/Settings.vue') },
       ],
     },
   ],

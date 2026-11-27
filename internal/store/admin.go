@@ -145,3 +145,10 @@ func (s *Store) SetAdminReauth(ctx context.Context, sessionID, until int64) erro
 		`UPDATE admin_sessions SET reauth_until = ? WHERE id = ?`, until, sessionID)
 	return err
 }
+
+// SetAdminTOTP 写入或清空 TOTP 秘钥（空串 = 停用）。
+func (s *Store) SetAdminTOTP(ctx context.Context, adminID int64, secret string) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE admins SET totp_secret = NULLIF(?, '') WHERE id = ?`, secret, adminID)
+	return err
+}

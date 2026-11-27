@@ -97,7 +97,7 @@ onMounted(load)
 
 <template>
   <div>
-    <n-space style="margin-bottom: 16px">
+    <n-space style="margin-bottom: 16px" :wrap="true">
       <n-input v-model:value="kami" placeholder="卡密包含" style="width: 220px" clearable @keyup.enter="search" />
       <select v-model="status" style="padding: 0 8px; height: 34px; border-radius: 3px; border: 1px solid #dcdfe6">
         <option value="">全部状态</option>
@@ -108,7 +108,7 @@ onMounted(load)
 
     <n-alert v-if="err" type="error" style="margin-bottom: 12px">{{ err }}</n-alert>
 
-    <n-data-table :columns="columns" :data="rows" :loading="loading" :bordered="false" size="small" />
+    <n-data-table :columns="columns" :data="rows" :loading="loading" :bordered="false" size="small" :scroll-x="900" />
 
     <n-space justify="end" style="margin-top: 16px">
       <n-pagination

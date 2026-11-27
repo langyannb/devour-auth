@@ -64,7 +64,7 @@ onMounted(load)
 <template>
   <div>
     <n-alert v-if="err" type="error" style="margin-bottom: 12px">{{ err }}</n-alert>
-    <n-data-table :columns="columns" :data="rows" :loading="loading" :bordered="false" size="small" />
+    <n-data-table :columns="columns" :data="rows" :loading="loading" :bordered="false" size="small" :scroll-x="700" />
     <n-space justify="end" align="center" style="margin-top: 16px">
       <span>共 {{ total }} 条</span>
       <n-button size="small" :disabled="page <= 1" @click="prev">上一页</n-button>
