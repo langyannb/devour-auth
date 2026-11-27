@@ -14,9 +14,17 @@ type AuditRow struct {
 }
 
 // ListAudit 倒序分页读取审计，供后台「审计」页与校验前浏览。
-func (s *Store) ListAudit(ctx context.Context, limit, offset int) ([]AuditRow, int64, error) {
+func (s *Store) ListAudit(ctx context.Context, appID int64, limit, offset int) ([]AuditRow, int64, error) {
+	where := ""
+	args := []any{}
+	if appID > 0 {
+		where = ` WHERE actor IN (
+			SELECT 'admin:' || id FROM admins WHERE app_id = ?
+			UNION SELECT 'agent:' || id FROM agents WHERE app_id = ?)`
+		args = append(args, appID, appID)
+	}
 	var total int64
-	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM audit_log`).Scan(&total); err != nil {
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM audit_log`+where, args...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 	if limit <= 0 || limit > 200 {
@@ -27,7 +35,7 @@ func (s *Store) ListAudit(ctx context.Context, limit, offset int) ([]AuditRow, i
 	}
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT id, ts, actor, action, COALESCE(target,''), COALESCE(before,''), COALESCE(after,''), COALESCE(ip,'')
-		   FROM audit_log ORDER BY id DESC LIMIT ? OFFSET ?`, limit, offset)
+		   FROM audit_log`+where+` ORDER BY id DESC LIMIT ? OFFSET ?`, append(args, limit, offset)...)
 	if err != nil {
 		return nil, 0, err
 	}

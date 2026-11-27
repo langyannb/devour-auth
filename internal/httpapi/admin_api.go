@@ -564,7 +564,7 @@ func (s *Server) extendCard(w http.ResponseWriter, r *http.Request) {
 // ---------- 审计 ----------
 
 func (s *Server) listAudit(w http.ResponseWriter, r *http.Request) {
-	rows, total, err := s.st.ListAudit(r.Context(),
+	rows, total, err := s.st.ListAudit(r.Context(), adminScopeID(r),
 		int(queryInt64(r, "limit")), int(queryInt64(r, "offset")))
 	if err != nil {
 		internalErr(w, s.log, "查审计失败", err)

@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { NAlert, NButton, NCard, NForm, NFormItem, NInput, NSpace, NTag } from 'naive-ui'
 import QRCode from 'qrcode'
-import { api, adminAppID } from '../api'
+import { api } from '../api'
 import { formatTs } from '../utils'
 
 interface Me {
@@ -32,7 +32,6 @@ interface OpsStatus {
 }
 
 const me = ref<Me | null>(null)
-const scoped = computed(() => adminAppID.value > 0)
 const err = ref('')
 const notice = ref('')
 
@@ -135,7 +134,7 @@ async function disable() {
 
 onMounted(() => {
   void loadMe()
-  if (!scoped.value) void loadOps()
+  void loadOps()
 })
 </script>
 
@@ -157,7 +156,7 @@ onMounted(() => {
       </p>
     </n-card>
 
-    <n-card v-if="!scoped" title="定时任务" size="small" style="margin-bottom: 16px">
+    <n-card title="定时任务" size="small" style="margin-bottom: 16px">
       <div class="ops-table">
         <div class="ops-row ops-head">
           <span>任务</span>

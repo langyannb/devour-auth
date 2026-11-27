@@ -1,12 +1,13 @@
 <script setup lang="ts">
-import { h, onMounted, ref } from 'vue'
+import { computed, h, onMounted, ref } from 'vue'
 import { NAlert, NButton, NDataTable, NForm, NFormItem, NInput, NModal, NSpace, NSwitch, NTag, type DataTableColumns } from 'naive-ui'
-import { api } from '../api'
+import { adminAppID, api } from '../api'
 import { formatTs } from '../utils'
 
 interface AppItem { id: number; code: string; name: string; active: number; created_at: number }
 
 const rows = ref<AppItem[]>([])
+const scoped = computed(() => adminAppID.value > 0)
 const err = ref('')
 const notice = ref('')
 const loading = ref(false)
@@ -77,7 +78,7 @@ onMounted(load)
 <template>
   <div>
     <n-space style="margin-bottom: 12px">
-      <n-button type="primary" @click="showCreate = true">新建应用</n-button>
+      <n-button v-if="!scoped" type="primary" @click="showCreate = true">新建应用</n-button>
       <n-button @click="load">刷新</n-button>
     </n-space>
     <n-alert v-if="err" type="error" style="margin-bottom: 12px">{{ err }}</n-alert>

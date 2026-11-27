@@ -47,7 +47,7 @@ func (s *Server) updateApp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	old, err := s.st.AppByID(ctx, id)
-	if err != nil {
+	if err != nil || (adminScopeID(r) > 0 && id != adminScopeID(r)) {
 		writeErr(w, http.StatusNotFound, CodeBadInput, "应用不存在")
 		return
 	}

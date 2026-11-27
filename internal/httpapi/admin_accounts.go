@@ -53,8 +53,12 @@ func (s *Server) listAccounts(w http.ResponseWriter, r *http.Request) {
 		internalErr(w, s.log, "查账号失败", err)
 		return
 	}
+	scope := adminScopeID(r)
 	out := make([]map[string]any, 0, len(list))
 	for _, a := range list {
+		if scope > 0 && a.AppID != scope {
+			continue
+		}
 		out = append(out, accountRow(a))
 	}
 	writeData(w, out)
@@ -97,6 +101,9 @@ func (s *Server) createAccount(w http.ResponseWriter, r *http.Request) {
 		internalErr(w, s.log, "哈希失败", err)
 		return
 	}
+	if scope := adminScopeID(r); scope > 0 {
+		req.AppID = scope
+	}
 	if req.AppID > 0 {
 		if _, err := s.st.AppByID(ctx, req.AppID); err != nil {
 			writeErr(w, http.StatusBadRequest, CodeBadInput, "应用不存在")
@@ -137,7 +144,7 @@ func (s *Server) resetAccountPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a, err := s.st.AdminByID(ctx, id)
-	if err != nil {
+	if err != nil || (adminScopeID(r) > 0 && a.AppID != adminScopeID(r)) {
 		writeErr(w, http.StatusNotFound, CodeBadInput, "账号不存在")
 		return
 	}

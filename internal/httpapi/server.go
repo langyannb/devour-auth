@@ -102,10 +102,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /admin/api/login", s.adminLogin)
 	mux.HandleFunc("POST /admin/api/logout", s.requireAdmin(s.adminLogout))
 	mux.HandleFunc("GET /admin/api/me", s.requireAdmin(s.adminMe))
-	mux.HandleFunc("GET /admin/api/accounts", s.requireAdmin(s.requireGlobal(s.requireRole("admin", s.listAccounts))))
-	mux.HandleFunc("POST /admin/api/accounts", s.requireAdmin(s.requireGlobal(s.requireRole("admin", s.createAccount))))
-	mux.HandleFunc("POST /admin/api/accounts/{id}/reset-password", s.requireAdmin(s.requireGlobal(s.requireRole("admin", s.resetAccountPassword))))
-	mux.HandleFunc("PATCH /admin/api/accounts/{id}/ip", s.requireAdmin(s.requireGlobal(s.requireRole("admin", s.requireReauth(s.setAccountIPAllow)))))
+	mux.HandleFunc("GET /admin/api/accounts", s.requireAdmin(s.requireRole("admin", s.listAccounts)))
+	mux.HandleFunc("POST /admin/api/accounts", s.requireAdmin(s.requireRole("admin", s.createAccount)))
+	mux.HandleFunc("POST /admin/api/accounts/{id}/reset-password", s.requireAdmin(s.requireRole("admin", s.resetAccountPassword)))
+	mux.HandleFunc("PATCH /admin/api/accounts/{id}/ip", s.requireAdmin(s.requireRole("admin", s.requireReauth(s.setAccountIPAllow))))
 	mux.HandleFunc("POST /admin/api/reauth", s.requireAdmin(s.adminReauth))
 	mux.HandleFunc("POST /admin/api/me/totp/setup", s.requireAdmin(s.adminTOTPSetup))
 	mux.HandleFunc("POST /admin/api/me/totp/enable", s.requireAdmin(s.adminTOTPEnable))
@@ -114,7 +114,7 @@ func (s *Server) Handler() http.Handler {
 	// 应用、卡类型、权限（改价/改策略需 reauth）
 	mux.HandleFunc("GET /admin/api/apps", s.requireAdmin(s.listApps))
 	mux.HandleFunc("POST /admin/api/apps", s.requireAdmin(s.requireGlobal(s.requireRole("admin", s.createApp))))
-	mux.HandleFunc("PATCH /admin/api/apps/{id}", s.requireAdmin(s.requireGlobal(s.requireRole("admin", s.updateApp))))
+	mux.HandleFunc("PATCH /admin/api/apps/{id}", s.requireAdmin(s.requireRole("admin", s.updateApp)))
 	mux.HandleFunc("POST /admin/api/policies", s.requireAdmin(s.requireRole("admin", s.requireReauth(s.createPolicy))))
 	mux.HandleFunc("PATCH /admin/api/policies/{id}", s.requireAdmin(s.requireRole("admin", s.requireReauth(s.updatePolicy))))
 	mux.HandleFunc("GET /admin/api/entitlements", s.requireAdmin(s.listEntitlements))
@@ -140,8 +140,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /admin/api/cards/{id}/entitlements/revoke", s.requireAdmin(s.revokeCardEntitlement))
 
 	// 审计
-	mux.HandleFunc("GET /admin/api/audit", s.requireAdmin(s.requireGlobal(s.listAudit)))
-	mux.HandleFunc("GET /admin/api/audit/verify", s.requireAdmin(s.requireGlobal(s.verifyAuditChain)))
+	mux.HandleFunc("GET /admin/api/audit", s.requireAdmin(s.listAudit))
+	mux.HandleFunc("GET /admin/api/audit/verify", s.requireAdmin(s.verifyAuditChain))
 	mux.HandleFunc("GET /admin/api/stats", s.requireAdmin(s.adminStats))
 	mux.HandleFunc("GET /admin/api/stats/trend", s.requireAdmin(s.statsTrend))
 	mux.HandleFunc("GET /admin/api/analytics", s.requireAdmin(s.adminAnalytics))
@@ -250,7 +250,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /admin/api/webhooks/{id}/toggle", s.requireAdmin(s.toggleWebhook))
 	mux.HandleFunc("DELETE /admin/api/webhooks/{id}", s.requireAdmin(s.deleteWebhook))
 	mux.HandleFunc("GET /admin/api/webhooks/deliveries", s.requireAdmin(s.listWebhookDeliveries))
-	mux.HandleFunc("GET /admin/api/ops/status", s.requireAdmin(s.requireGlobal(s.opsStatus)))
+	mux.HandleFunc("GET /admin/api/ops/status", s.requireAdmin(s.opsStatus))
 	mux.HandleFunc("POST /admin/api/open/keys/{id}/disable", s.requireAdmin(s.setAPIKeyStatus(false)))
 	mux.HandleFunc("POST /admin/api/open/keys/{id}/enable", s.requireAdmin(s.setAPIKeyStatus(true)))
 

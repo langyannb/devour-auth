@@ -74,6 +74,10 @@ func (s *Server) setAccountIPAllow(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	before, err := s.st.AdminAccountByID(ctx, id)
+	if err == nil && adminScopeID(r) > 0 && before.AppID != adminScopeID(r) {
+		writeErr(w, http.StatusNotFound, CodeBadInput, "账号不存在")
+		return
+	}
 	if errors.Is(err, store.ErrNotFound) {
 		writeErr(w, http.StatusNotFound, CodeBadInput, "账号不存在")
 		return

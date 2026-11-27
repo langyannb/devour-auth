@@ -78,47 +78,12 @@ const fullMenu = computed<MenuOption[]>(() => [
   },
 ])
 
-// 绑定应用的账号只看自己那摊：没有代理/财务/应用管理/审计/运营
+// 绑定应用的账号权限一样，只是数据限定在自己的应用；安全体检是实例级的，不给
 const menu = computed<MenuOption[]>(() => {
   if (!scoped.value) return fullMenu.value
-  return [
-    { label: '概览', key: '/dashboard' },
-    { label: '数据', key: '/analytics' },
-    {
-      type: 'group',
-      key: 'g-cards',
-      label: '卡务',
-      children: [
-        { label: '卡密', key: '/cards' },
-        { label: '发卡', key: '/issue' },
-        { label: '设备', key: '/devices' },
-        { label: '在线', key: '/sessions' },
-        { label: '黑名单', key: '/blacklist' },
-      ],
-    },
-    {
-      type: 'group',
-      key: 'g-content',
-      label: '内容',
-      children: [{ label: '权限包', key: '/entitlements' }],
-    },
-    {
-      type: 'group',
-      key: 'g-integration',
-      label: '集成',
-      children: [
-        { label: '开放接口', key: '/open' },
-        { label: '回调', key: '/webhooks' },
-      ],
-    },
-    {
-      type: 'group',
-      key: 'g-ops',
-      label: '运维',
-      children: [{ label: '日志', key: '/events' }],
-    },
-    { label: '设置', key: '/settings' },
-  ]
+  return fullMenu.value
+    .map((g) => (g.type === 'group' ? { ...g, children: (g.children ?? []).filter((c) => c.key !== '/security') } : g))
+    .filter((g) => g.type !== 'group' || (g.children ?? []).length > 0)
 })
 
 function onMenu(key: string) {
