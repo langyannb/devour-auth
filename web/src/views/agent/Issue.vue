@@ -19,6 +19,7 @@ const busy = ref(false)
 const isMobile = useMobile()
 
 const plan = ref<PlanResp | null>(null)
+const quota = ref<number>(-1)
 const form = ref({
   kind: 'week',
   multiplier: 1,
@@ -49,8 +50,12 @@ const customLines = computed(() =>
 async function load() {
   err.value = ''
   try {
-    const d = await agentApi.get<PlanResp>('/agent/api/plan')
+    const [d, s] = await Promise.all([
+      agentApi.get<PlanResp>('/agent/api/plan'),
+      agentApi.get<{ quota_cents: number }>('/agent/api/summary'),
+    ])
     plan.value = d
+    quota.value = s.quota_cents
     if (d.plan && d.plan.items.length > 0) {
       form.value.kind = d.plan.items[0].kind
     }
@@ -119,7 +124,12 @@ onMounted(load)
 
     <n-card v-else title="出卡">
       <template #header-extra>
-        <n-tag size="small">{{ plan.plan.name }}</n-tag>
+        <n-space align="center">
+          <n-tag size="small">{{ plan.plan.name }}</n-tag>
+          <n-tag size="small" :type="quota < 0 ? 'info' : quota >= total ? 'success' : 'error'">
+            可用额度 {{ quota < 0 ? '不限' : formatYuan(quota) + ' 元' }}
+          </n-tag>
+        </n-space>
       </template>
 
       <n-form :label-placement="isMobile ? 'top' : 'left'" label-width="110">

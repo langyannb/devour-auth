@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { h, onMounted, ref } from 'vue'
+import { computed, h, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   NAlert, NButton, NDataTable, NForm, NFormItem, NInput, NInputNumber,
@@ -31,8 +31,9 @@ const showCreate = ref(false)
 const createForm = ref({ name: '', password: '', quotaYuan: 0 })
 const busy = ref(false)
 
-const quotaTarget = ref<Agent | null>(null)
-const quotaForm = ref({ amountYuan: 100, note: '' })
+const quotaDlg = ref<{ agent: Agent; mode: 'add' | 'sub' } | null>(null)
+const quotaAmount = ref(100)
+const quotaNote = ref('')
 
 const editTarget = ref<Agent | null>(null)
 const editForm = ref({ quotaYuan: 0 })
@@ -61,13 +62,14 @@ const columns: DataTableColumns<Agent> = [
   {
     title: '操作',
     key: 'op',
-    width: 260,
+    width: 320,
     render: (r) =>
       h(NSpace, { size: 4 }, {
         default: () => [
           h(NButton, { size: 'tiny', onClick: () => router.push(`/agents/${r.id}`) }, { default: () => '价格表' }),
-          h(NButton, { size: 'tiny', type: 'primary', onClick: () => openQuota(r) }, { default: () => '加额度' }),
           h(NButton, { size: 'tiny', onClick: () => openEdit(r) }, { default: () => '设额度' }),
+          h(NButton, { size: 'tiny', type: 'primary', onClick: () => openQuota(r, 'add') }, { default: () => '加' }),
+          h(NButton, { size: 'tiny', type: 'warning', onClick: () => openQuota(r, 'sub') }, { default: () => '扣' }),
           h(NButton, {
             size: 'tiny',
             type: r.status === 'active' ? 'error' : 'success',
@@ -134,22 +136,31 @@ async function saveEdit() {
   }
 }
 
-function openQuota(a: Agent) {
-  quotaTarget.value = a
-  quotaForm.value = { amountYuan: 100, note: '' }
+function openQuota(a: Agent, mode: 'add' | 'sub') {
+  quotaDlg.value = { agent: a, mode }
+  quotaAmount.value = 100
+  quotaNote.value = ''
 }
 
-async function addQuota() {
-  if (!quotaTarget.value) return
+const quotaTitle = computed(() => (quotaDlg.value?.mode === 'sub' ? '扣额度' : '加额度'))
+
+const quotaDelta = computed(() => {
+  const amount = Math.round((quotaAmount.value || 0) * 100)
+  return quotaDlg.value?.mode === 'sub' ? -amount : amount
+})
+
+async function submitQuota() {
+  if (!quotaDlg.value) return
   err.value = ''
+  notice.value = ''
   busy.value = true
   try {
-    await api.post(`/admin/api/agents/${quotaTarget.value.id}/quota`, {
-      delta_cents: Math.round(quotaForm.value.amountYuan * 100),
-      note: quotaForm.value.note,
+    await api.post(`/admin/api/agents/${quotaDlg.value.agent.id}/quota`, {
+      delta_cents: quotaDelta.value,
+      note: quotaNote.value,
     })
-    notice.value = '额度已调整'
-    quotaTarget.value = null
+    notice.value = quotaDlg.value.mode === 'sub' ? '额度已扣减' : '额度已增加'
+    quotaDlg.value = null
     await load()
   } catch (e) {
     err.value = (e as Error).message
@@ -198,24 +209,29 @@ onMounted(load)
       </n-form>
     </n-modal>
 
-    <n-modal :show="!!quotaTarget" preset="card" title="加 / 扣额度" style="width: min(420px, 94vw)"
-      @update:show="(v: boolean) => { if (!v) quotaTarget = null }">
+    <n-modal :show="!!quotaDlg" preset="card" :title="quotaTitle" style="width: min(420px, 94vw)"
+      @update:show="(v: boolean) => { if (!v) quotaDlg = null }">
       <n-form label-placement="top">
-        <n-form-item label="金额（元，正数加、负数扣）">
-          <n-input-number v-model:value="quotaForm.amountYuan" />
+        <n-form-item label="金额（元）">
+          <n-input-number v-model:value="quotaAmount" :min="0.01" />
         </n-form-item>
         <n-form-item label="备注（可选）">
-          <n-input v-model:value="quotaForm.note" placeholder="例如：微信转账 500" />
+          <n-input v-model:value="quotaNote" placeholder="例如：微信转账 500" />
         </n-form-item>
-        <n-button type="primary" :loading="busy" block @click="addQuota">确认</n-button>
+        <div style="font-size: 12px; color: #8b93a7; margin-bottom: 12px">
+          当前 {{ quotaDlg ? (quotaDlg.agent.quota_cents < 0 ? '不限' : formatYuan(quotaDlg.agent.quota_cents) + ' 元') : '' }}
+          → 操作后 {{ quotaDlg ? (quotaDlg.agent.quota_cents < 0 ? '不限' : formatYuan(Math.max(0, quotaDlg.agent.quota_cents + quotaDelta)) + ' 元') : '' }}
+        </div>
+        <n-button type="primary" :loading="busy" block @click="submitQuota">确认</n-button>
       </n-form>
     </n-modal>
 
-    <n-modal :show="!!editTarget" preset="card" title="调整代理策略" style="width: min(420px, 94vw)"
+    <n-modal :show="!!editTarget" preset="card" title="设置额度" style="width: min(420px, 94vw)"
       @update:show="(v: boolean) => { if (!v) editTarget = null }">
       <n-form label-placement="top">
-        <n-form-item label="月额度（元，0 = 不限）">
-          <n-input-number v-model:value="editForm.quotaYuan" :min="0" />
+        <n-form-item label="额度（元）">
+          <n-input-number v-model:value="editForm.quotaYuan" :min="-1" />
+          <span style="margin-left: 10px; font-size: 12px; color: #8b93a7">直接覆盖；-1 = 不限</span>
         </n-form-item>
         <n-button type="primary" :loading="busy" block @click="saveEdit">保存</n-button>
       </n-form>
