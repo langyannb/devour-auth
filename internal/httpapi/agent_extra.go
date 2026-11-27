@@ -29,19 +29,15 @@ func (s *Server) agentCreateSub(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, CodeBadInput, "代理名必填，密码至少 12 位")
 		return
 	}
-	if req.DiscountBP < c.Agent.DiscountBP || req.DiscountBP > 10000 {
-		writeErr(w, http.StatusBadRequest, CodeBadInput,
-			fmt.Sprintf("下级折扣不能低于你的成本（%d 基点）", c.Agent.DiscountBP))
-		return
-	}
+	// 折扣模型已废弃（价格由模板决定），这里只保留字段兼容
 	hash, err := auth.HashPassword(req.Password)
 	if err != nil {
 		internalErr(w, s.log, "哈希失败", err)
 		return
 	}
 	id, err := s.st.CreateAgent(r.Context(), store.Agent{
-		Name: req.Name, ParentID: store.NullInt64(c.Agent.ID), Level: 2,
-		DiscountBP: req.DiscountBP, RebateBP: 0, MonthlyQuotaCents: 0,
+		AppID: c.Agent.AppID, Name: req.Name, ParentID: store.NullInt64(c.Agent.ID), Level: 2,
+		DiscountBP: 10000, RebateBP: 0, QuotaCents: 0,
 		PassHash: hash, Status: "active", CreatedAt: s.now().Unix(),
 	})
 	if err == store.ErrConflict {

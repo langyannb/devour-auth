@@ -366,7 +366,17 @@ func (s *Server) agentSubagents(w http.ResponseWriter, r *http.Request) {
 	me["is_self"] = true
 	out = append(out, me)
 	for _, a := range subs {
-		out = append(out, agentJSON(a))
+		m := agentJSON(a)
+		if perms, planID, err := s.st.AgentPermissions(ctx, a.ID); err == nil {
+			m["permissions"] = perms
+			m["plan_id"] = planID
+			if planID > 0 {
+				if p, err := s.st.AgentPlanByID(ctx, planID); err == nil {
+					m["plan_name"] = p.Name
+				}
+			}
+		}
+		out = append(out, m)
 	}
 	writeData(w, out)
 }
