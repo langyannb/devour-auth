@@ -32,6 +32,7 @@ const adminRoutes: RouteRecordRaw[] = [
       { path: 'apps', meta: { title: '应用' }, component: () => import('./views/Apps.vue') },
       { path: 'accounts', meta: { title: '账号' }, component: () => import('./views/Accounts.vue') },
       { path: 'open', meta: { title: '开放接口' }, component: () => import('./views/OpenApi.vue') },
+      { path: 'integration', meta: { title: '对接信息' }, component: () => import('./views/Integration.vue') },
       { path: 'webhooks', meta: { title: '回调' }, component: () => import('./views/Webhooks.vue') },
       { path: 'blacklist', meta: { title: '黑名单' }, component: () => import('./views/Blacklist.vue') },
       { path: 'events', meta: { title: '日志' }, component: () => import('./views/Events.vue') },

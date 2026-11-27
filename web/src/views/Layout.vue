@@ -52,6 +52,7 @@ const fullMenu = computed<MenuOption[]>(() => [
     key: 'g-integration',
     label: '集成',
     children: [
+      { label: '对接信息', key: '/integration' },
       { label: '开放接口', key: '/open' },
       { label: '回调', key: '/webhooks' },
     ],
