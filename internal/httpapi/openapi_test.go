@@ -44,7 +44,7 @@ func (o *openCaller) call(t *testing.T, method, path, body string) (int, string)
 	req.Header.Set("X-Timestamp", ts)
 	req.Header.Set("X-Nonce", nonce)
 	req.Header.Set("X-Signature", hmacSign(o.secret, method, path, ts, nonce, body))
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := (&http.Client{Timeout: 10 * time.Second}).Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -101,7 +101,7 @@ func TestOpenAPISignature(t *testing.T) {
 	req.Header.Set("X-Timestamp", ts)
 	req.Header.Set("X-Nonce", nonce)
 	req.Header.Set("X-Signature", hmacSign(o.secret, http.MethodPost, "/open/v1/cards/query", ts, nonce, `{"kami":"X"}`))
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := (&http.Client{Timeout: 10 * time.Second}).Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -127,7 +127,7 @@ func TestOpenAPINonceReplay(t *testing.T) {
 		req.Header.Set("X-Timestamp", ts)
 		req.Header.Set("X-Nonce", nonce)
 		req.Header.Set("X-Signature", sig)
-		resp, err := http.DefaultClient.Do(req)
+		resp, err := (&http.Client{Timeout: 10 * time.Second}).Do(req)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -192,5 +192,34 @@ func TestOpenAPIQuickIssue(t *testing.T) {
 		kami, time.Now().Unix())
 	if code, body := e.do(t, &http.Client{}, http.MethodPost, "/v1/auth/login", "", "5.9.9.9", loginBody); code != http.StatusOK {
 		t.Fatalf("开放接口发的卡应能登录: %d %s", code, body)
+	}
+}
+
+// 开放接口：永久卡续期要回 400 而不是 500；授权接口不能在事务里把自己锁死。
+func TestOpenAPIErrorsAndGrant(t *testing.T) {
+	e := setup(t)
+	o := newOpenCaller(t, e, "cards:write,cards:read")
+
+	// 发一张永久卡
+	if code, body := o.call(t, http.MethodPost, "/open/v1/cards/quick", `{"kind":"forever","qty":1}`); code != http.StatusOK {
+		t.Fatalf("发永久卡失败: %d %s", code, body)
+	}
+	var kami string
+	_ = e.st.DB().QueryRow(`SELECT kami FROM cards WHERE kind = 'forever' ORDER BY id DESC LIMIT 1`).Scan(&kami)
+
+	code, body := o.call(t, http.MethodPost, "/open/v1/cards/extend", fmt.Sprintf(`{"kami":%q,"days":3}`, kami))
+	if code != http.StatusBadRequest || !strings.Contains(body, "永久卡") {
+		t.Fatalf("永久卡续期应 400 并说明原因: %d %s", code, body)
+	}
+
+	// 授权：先建一个权限，再通过开放接口附加（这里曾经因为事务+单连接死锁）
+	if _, err := e.st.DB().Exec(`INSERT INTO entitlements(app_id, code, name, cost_points, active, created_at)
+		VALUES(1, 'vip', '会员', 0, 1, 1000)`); err != nil {
+		t.Fatal(err)
+	}
+	code, body = o.call(t, http.MethodPost, "/open/v1/cards/entitlements/grant",
+		fmt.Sprintf(`{"kami":%q,"code":"vip"}`, kami))
+	if code != http.StatusOK {
+		t.Fatalf("授权应成功: %d %s", code, body)
 	}
 }

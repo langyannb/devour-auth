@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -30,6 +31,18 @@ type openKeyCtxKey struct{}
 
 func openKeyFrom(r *http.Request) store.APIKey {
 	return r.Context().Value(openKeyCtxKey{}).(store.APIKey)
+}
+
+// writeOpenError 把卡状态类错误回成 400，别当成服务端内部错误（500）。
+func (s *Server) writeOpenError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, card.ErrState), errors.Is(err, card.ErrInvalid):
+		writeErr(w, http.StatusBadRequest, apierr.BadInput, err.Error())
+	case errors.Is(err, store.ErrNotFound):
+		writeErr(w, http.StatusNotFound, apierr.CardNotFound, "卡密不存在")
+	default:
+		s.writeAPIError(w, err)
+	}
 }
 
 // openCard 按卡密取卡，并确认属于当前密钥的应用（跨应用一律当不存在）。
@@ -212,7 +225,7 @@ func (s *Server) openExtend(w http.ResponseWriter, r *http.Request) {
 		IP:     clientIP(r),
 	})
 	if err != nil {
-		s.writeAPIError(w, err)
+		s.writeOpenError(w, err)
 		return
 	}
 	writeData(w, map[string]any{"id": c.ID, "updated": true})
@@ -236,7 +249,7 @@ func (s *Server) openUnbind(w http.ResponseWriter, r *http.Request) {
 		Actor:  fmt.Sprintf("open:%s", k.KeyID),
 		IP:     clientIP(r),
 	}); err != nil {
-		s.writeAPIError(w, err)
+		s.writeOpenError(w, err)
 		return
 	}
 	writeData(w, map[string]any{"id": c.ID, "unbound": true})
@@ -256,6 +269,7 @@ func (s *Server) openGrant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ctx := r.Context()
+	k := openKeyFrom(r)
 	tx, err := s.st.DB().BeginTx(ctx, nil)
 	if err != nil {
 		internalErr(w, s.log, "事务失败", err)
@@ -263,8 +277,10 @@ func (s *Server) openGrant(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback()
 
-	c, ok := s.openCard(w, r, req.Kami)
-	if !ok {
+	// 事务里必须用 Tx 方法，否则单连接会被自己锁死
+	c, err := s.st.CardByKamiTx(ctx, tx, k.AppID, req.Kami)
+	if err != nil {
+		writeErr(w, http.StatusNotFound, apierr.CardNotFound, "卡密不存在")
 		return
 	}
 	ent, err := s.st.EntitlementByCodeTx(ctx, tx, c.AppID, req.Code)
@@ -272,7 +288,6 @@ func (s *Server) openGrant(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, apierr.BadInput, "权限不存在")
 		return
 	}
-	k := openKeyFrom(r)
 	if err := s.st.GrantCardEntitlementTx(ctx, tx, c.ID, ent.ID, 0, req.ExpiresAt); err != nil {
 		internalErr(w, s.log, "附加权限失败", err)
 		return
