@@ -51,6 +51,10 @@ const ledgerCols: DataTableColumns<Ledger> = [
   { title: '关联', key: 'ref' },
 ]
 
+function exportCSV() {
+  window.open('/agent/api/ledger/export', '_blank')
+}
+
 async function load() {
   loading.value = true
   try {
@@ -77,6 +81,9 @@ onMounted(load)
       <n-data-table :columns="billCols" :data="bills" :loading="loading" :bordered="false" size="small" :scroll-x="600" />
     </n-card>
     <n-card title="流水">
+      <template #header-extra>
+        <n-button size="small" @click="exportCSV">导出 CSV</n-button>
+      </template>
       <n-data-table :columns="ledgerCols" :data="ledger" :loading="loading" :bordered="false" size="small" :scroll-x="600" />
     </n-card>
   </div>
