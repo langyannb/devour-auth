@@ -35,9 +35,6 @@ const quotaDlg = ref<{ agent: Agent; mode: 'add' | 'sub' } | null>(null)
 const quotaAmount = ref(100)
 const quotaNote = ref('')
 
-const editTarget = ref<Agent | null>(null)
-const editForm = ref({ quotaYuan: 0 })
-
 const statusTag = (s: string) =>
   h(NTag, { size: 'small', type: s === 'active' ? 'success' : 'error' },
     { default: () => (s === 'active' ? '正常' : '冻结') })
@@ -62,12 +59,11 @@ const columns: DataTableColumns<Agent> = [
   {
     title: '操作',
     key: 'op',
-    width: 320,
+    width: 260,
     render: (r) =>
       h(NSpace, { size: 4 }, {
         default: () => [
           h(NButton, { size: 'tiny', onClick: () => router.push(`/agents/${r.id}`) }, { default: () => '价格表' }),
-          h(NButton, { size: 'tiny', onClick: () => openEdit(r) }, { default: () => '设额度' }),
           h(NButton, { size: 'tiny', type: 'primary', onClick: () => openQuota(r, 'add') }, { default: () => '加' }),
           h(NButton, { size: 'tiny', type: 'warning', onClick: () => openQuota(r, 'sub') }, { default: () => '扣' }),
           h(NButton, {
@@ -105,29 +101,6 @@ async function create() {
     notice.value = `已创建代理 ${createForm.value.name}`
     showCreate.value = false
     createForm.value = { name: '', password: '', quotaYuan: 0 }
-    await load()
-  } catch (e) {
-    err.value = (e as Error).message
-  } finally {
-    busy.value = false
-  }
-}
-
-function openEdit(a: Agent) {
-  editTarget.value = a
-  editForm.value = { quotaYuan: a.quota_cents / 100 }
-}
-
-async function saveEdit() {
-  if (!editTarget.value) return
-  err.value = ''
-  busy.value = true
-  try {
-    await api.patch(`/admin/api/agents/${editTarget.value.id}`, {
-      monthly_quota_cents: Math.round(editForm.value.quotaYuan * 100),
-    })
-    notice.value = '已更新代理策略'
-    editTarget.value = null
     await load()
   } catch (e) {
     err.value = (e as Error).message
@@ -226,15 +199,5 @@ onMounted(load)
       </n-form>
     </n-modal>
 
-    <n-modal :show="!!editTarget" preset="card" title="设置额度" style="width: min(420px, 94vw)"
-      @update:show="(v: boolean) => { if (!v) editTarget = null }">
-      <n-form label-placement="top">
-        <n-form-item label="额度（元）">
-          <n-input-number v-model:value="editForm.quotaYuan" :min="-1" />
-          <span style="margin-left: 10px; font-size: 12px; color: #8b93a7">直接覆盖；-1 = 不限</span>
-        </n-form-item>
-        <n-button type="primary" :loading="busy" block @click="saveEdit">保存</n-button>
-      </n-form>
-    </n-modal>
   </div>
 </template>
