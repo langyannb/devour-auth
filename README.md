@@ -7,8 +7,9 @@
 
 ## 状态
 
-I1 + I2 已完成并部署在 `https://net.namikao.com`：卡密/卡类型/权限/设备/会话、审计链与锚定、
-代理体系（折扣/额度/返点/账单）与代理端。未开始：开放 API（I3）、运营端（I4）。
+已部署在 `https://net.namikao.com`：卡密/卡类型/权限/设备/会话、审计链与锚定、代理体系
+（价格模板/额度/返点/账单）、管理端与代理端、数据看板（含省份来源）、客户端协议、
+开放 API、多应用与账号-应用隔离。
 
 ## 技术栈
 
@@ -22,13 +23,13 @@ I1 + I2 已完成并部署在 `https://net.namikao.com`：卡密/卡类型/权�
 make dev          # 后端 http://127.0.0.1:6760
 make web          # 前端 http://127.0.0.1:5173
 make seed         # 测试数据
-make test         # 单测 + 类型检查
+make check        # gofmt + go vet + go test + vue-tsc + 前端单测
 ```
 
 首次运行创建管理员：
 
 ```bash
-./bin/authd admin create --username admin
+./bin/devour-authd init-admin   # 或 make dev-init
 ```
 
 ## 文档
@@ -37,7 +38,8 @@ make test         # 单测 + 类型检查
 |---|---|
 | `docs/design.md` | 完整设计：数据模型、卡类型、权限、代理、协议、安全 |
 | `docs/runbook.md` | 部署、发布、回滚、备份、故障处理 |
-| `docs/openapi.yaml` | 开放接口定义（待补） |
+| `docs/integration.md` | **对接文档**：客户端协议、开放 API、错误码、示例代码 |
+| `docs/openapi.yaml` | 接口定义（客户端协议 + 开放 API） |
 
 ## 约定
 

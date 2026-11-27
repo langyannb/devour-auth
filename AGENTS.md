@@ -82,6 +82,7 @@ make deploy HOST=root@43.248.187.94
 | 设计、数据模型、协议 | `docs/design.md` |
 | 部署与故障处理 | `docs/runbook.md` |
 | 接口定义 | `docs/openapi.yaml` |
+| 对接说明（客户端 / 开放 API） | `docs/integration.md` |
 | 进行中的任务 | 会话 todo / PR |
 | 已发生的改动 | git log、PR |
 
