@@ -56,7 +56,7 @@ async function submit() {
         <n-form-item label="动态验证码">
           <n-input v-model:value="totp" placeholder="6 位数字" maxlength="6" />
         </n-form-item>
-        <n-button type="primary" block :loading="busy" @click="submit">登录</n-button>
+        <n-button type="primary" block :loading="busy" @click="submit">{{ busy ? '登录中…' : '登录' }}</n-button>
       </n-form>
     </n-card>
   </div>

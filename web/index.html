@@ -4,9 +4,38 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Devour Auth</title>
+    <style>
+      /* 首屏骨架：JS 没加载完也有反馈，不留白屏 */
+      html, body { margin: 0; height: 100%; background: #f7f8fb; }
+      .boot {
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        font-family: system-ui, -apple-system, 'PingFang SC', sans-serif;
+        color: #6b7280;
+        font-size: 14px;
+      }
+      .boot-spin {
+        width: 26px;
+        height: 26px;
+        border: 3px solid #e5e7eb;
+        border-top-color: #4f46e5;
+        border-radius: 50%;
+        animation: boot-rotate 0.8s linear infinite;
+      }
+      @keyframes boot-rotate { to { transform: rotate(360deg); } }
+    </style>
   </head>
   <body>
-    <div id="app"></div>
+    <div id="app">
+      <div class="boot">
+        <div class="boot-spin"></div>
+        <div>加载中…</div>
+      </div>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

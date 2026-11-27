@@ -48,7 +48,7 @@ async function submit() {
         <n-form-item label="密码">
           <n-input v-model:value="password" type="password" show-password-on="click" />
         </n-form-item>
-        <n-button type="primary" block :loading="busy" @click="submit">登录</n-button>
+        <n-button type="primary" block :loading="busy" @click="submit">{{ busy ? '登录中…' : '登录' }}</n-button>
       </n-form>
     </n-card>
   </div>

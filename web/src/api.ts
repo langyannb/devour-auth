@@ -65,11 +65,22 @@ async function request<T>(path: string, init: RequestInit = {}, scope: Scope = '
   if (init.body) headers['Content-Type'] = 'application/json'
   if (method !== 'GET' && method !== 'HEAD') headers['X-CSRF-Token'] = getCSRF(scope)
 
-  const res = await fetch(path, {
-    ...init,
-    headers: { ...headers, ...(init.headers as Record<string, string> | undefined) },
-    credentials: 'same-origin',
-  })
+  // 15 秒超时：网络卡住时给明确反馈，而不是一直转圈
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), 15000)
+  let res: Response
+  try {
+    res = await fetch(path, {
+      ...init,
+      headers: { ...headers, ...(init.headers as Record<string, string> | undefined) },
+      credentials: 'same-origin',
+      signal: ctrl.signal,
+    })
+  } catch (e) {
+    throw new ApiError('NETWORK', (e as Error).name === 'AbortError' ? '请求超时，请重试' : '网络错误，请检查连接')
+  } finally {
+    clearTimeout(timer)
+  }
   const body = (await res.json().catch(() => ({
     ok: false,
     code: 'BAD_INPUT',

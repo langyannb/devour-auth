@@ -157,6 +157,15 @@ server {
 
     client_max_body_size 2m;
 
+    # 不开启时 JS/CSS 裸传，首屏要拉 300KB+，国内网络下白屏数秒
+    gzip on;
+    gzip_vary on;
+    gzip_comp_level 5;
+    gzip_min_length 1024;
+    gzip_proxied any;
+    gzip_types text/plain text/css text/javascript application/javascript
+               application/json application/xml image/svg+xml;
+
     location / {
         limit_req zone=devourauth burst=20 nodelay;
         proxy_pass http://127.0.0.1:6760;
