@@ -56,7 +56,7 @@ const columns = computed<DataTableColumns<Card>>(() => [
     render: (r) => h(NTag, { type: statusType(r.status), size: 'small' }, { default: () => statusLabels[r.status] ?? r.status }),
   },
   {
-    title: '余额',
+    title: '剩余',
     key: 'balance',
     width: 110,
     render: (r) => {
