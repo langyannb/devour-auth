@@ -186,6 +186,8 @@ func (s *Server) Handler() http.Handler {
 
 	// 代理端（独立会话域）
 	mux.HandleFunc("POST /agent/api/login", s.agentLogin)
+	mux.HandleFunc("GET /agent/api/invite/{code}", s.agentInviteInfo)
+	mux.HandleFunc("POST /agent/api/invite/{code}", s.agentInviteActivate)
 	mux.HandleFunc("POST /agent/api/logout", s.requireAgent(s.agentLogout))
 	mux.HandleFunc("GET /agent/api/me", s.requireAgent(s.agentMe))
 	mux.HandleFunc("GET /agent/api/policies", s.requireAgent(s.agentPolicies))

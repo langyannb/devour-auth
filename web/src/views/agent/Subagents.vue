@@ -5,7 +5,7 @@ import {
   NSelect, NSpace, NSwitch, NTag, type DataTableColumns,
 } from 'naive-ui'
 import { agentApi } from '../../api'
-import { formatYuan } from '../../utils'
+import { copyText, formatYuan } from '../../utils'
 
 interface Perms {
   SetDeviceLimit: boolean
@@ -23,6 +23,8 @@ interface Sub {
   plan_name?: string
   permissions?: Perms
   is_self?: boolean
+  login_link?: string
+  activated?: boolean
 }
 
 interface PlanItem { kind: string; name: string; price_cents: number }
@@ -39,6 +41,7 @@ const showCreate = ref(false)
 const form = ref({ name: '', password: '' })
 
 const quotaDlg = ref<Sub | null>(null)
+const linkDlg = ref<{ name: string; link: string } | null>(null)
 const quotaYuan = ref(100)
 const planDlg = ref<Sub | null>(null)
 const planValue = ref<number | null>(null)
@@ -58,6 +61,9 @@ const columns: DataTableColumns<Sub> = [
         r.name,
         r.is_self ? h(NTag, { size: 'tiny', type: 'info', style: 'margin-left:8px' }, { default: () => '我' }) : null,
         r.level === 2 ? h(NTag, { size: 'tiny', style: 'margin-left:6px' }, { default: () => '下级' }) : null,
+        !r.is_self && r.activated === false
+          ? h(NTag, { size: 'tiny', type: 'warning', style: 'margin-left:6px' }, { default: () => '待激活' })
+          : null,
       ]),
   },
   {
@@ -71,12 +77,13 @@ const columns: DataTableColumns<Sub> = [
   {
     title: '操作',
     key: 'op',
-    width: 260,
+    width: 320,
     render: (r) =>
       r.is_self
         ? '—'
         : h(NSpace, { size: 4 }, {
             default: () => [
+              h(NButton, { size: 'tiny', onClick: () => showLink(r) }, { default: () => '登录链接' }),
               h(NButton, { size: 'tiny', type: 'primary', onClick: () => openQuota(r) }, { default: () => '划额度' }),
               h(NButton, { size: 'tiny', onClick: () => openPlan(r) }, { default: () => '设模板' }),
               h(NButton, { size: 'tiny', onClick: () => openPerms(r) }, { default: () => '设权限' }),
@@ -112,19 +119,31 @@ async function createSub() {
   notice.value = ''
   busy.value = true
   try {
-    await agentApi.post('/agent/api/subagents', {
+    const d = await agentApi.post<{ id: number; name: string; login_link: string }>('/agent/api/subagents', {
       name: form.value.name,
       password: form.value.password,
     })
-    notice.value = `已开通下级 ${form.value.name}，请接着给他设模板和额度`
+    notice.value = `已开通下级 ${form.value.name}，把登录链接发给他`
     showCreate.value = false
     form.value = { name: '', password: '' }
+    if (d.login_link) linkDlg.value = { name: d.name, link: d.login_link }
     await load()
   } catch (e) {
     err.value = (e as Error).message
   } finally {
     busy.value = false
   }
+}
+
+async function showLink(r: Sub) {
+  if (!r.login_link) return
+  linkDlg.value = { name: r.name, link: r.login_link }
+}
+
+async function copyLink() {
+  if (!linkDlg.value) return
+  if (await copyText(linkDlg.value.link)) notice.value = '链接已复制，发给下级即可'
+  else err.value = '复制失败，请手动选中链接'
 }
 
 function openQuota(r: Sub) {
@@ -236,13 +255,26 @@ onMounted(load)
         <n-form-item label="代理名">
           <n-input v-model:value="form.name" placeholder="下级登录名" />
         </n-form-item>
-        <n-form-item label="初始密码（至少 12 位）">
-          <n-input v-model:value="form.password" type="password" show-password-on="click" />
+        <n-form-item label="初始密码（可留空）">
+          <n-input v-model:value="form.password" type="password" show-password-on="click" placeholder="留空则由下级通过链接自己设置" />
         </n-form-item>
       </n-form>
       <n-space justify="end">
         <n-button @click="showCreate = false">取消</n-button>
         <n-button type="primary" :loading="busy" @click="createSub">开通</n-button>
+      </n-space>
+    </n-modal>
+
+    <n-modal :show="linkDlg !== null" @update:show="(v: boolean) => { if (!v) linkDlg = null }" preset="card" title="下级登录链接" style="width: 520px">
+      <template v-if="linkDlg">
+        <p style="margin-top: 0; font-size: 13px; color: #666">
+          把这个链接发给「{{ linkDlg.name }}」，他打开后设置密码就能登录代理端。
+        </p>
+        <n-input :value="linkDlg.link" readonly />
+      </template>
+      <n-space justify="end" style="margin-top: 16px">
+        <n-button @click="linkDlg = null">关闭</n-button>
+        <n-button type="primary" @click="copyLink">复制链接</n-button>
       </n-space>
     </n-modal>
 

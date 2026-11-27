@@ -367,6 +367,8 @@ func (s *Server) agentSubagents(w http.ResponseWriter, r *http.Request) {
 	out = append(out, me)
 	for _, a := range subs {
 		m := agentJSON(a)
+		m["login_link"] = s.agentInviteLink(a.LoginSlug)
+		m["activated"] = a.PasswordSet == 1
 		if perms, planID, err := s.st.AgentPermissions(ctx, a.ID); err == nil {
 			m["permissions"] = perms
 			m["plan_id"] = planID
@@ -494,12 +496,14 @@ func (s *Server) createAgent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	slug, _ := newAgentSlug()
 	a := store.Agent{
 		AppID: app.ID, Name: req.Name, Level: 1, DiscountBP: req.DiscountBP,
 		RebateBP:          req.RebateBP,
 		MonthlyQuotaCents: req.MonthlyQuotaCents,
 		QuotaCents:        req.MonthlyQuotaCents,
 		PassHash:          hash, Status: "active", CreatedAt: s.now().Unix(),
+		LoginSlug: slug, PasswordSet: 1,
 	}
 	if req.ParentID > 0 {
 		parent, err := s.st.AgentByID(ctx, req.ParentID)
@@ -526,7 +530,9 @@ func (s *Server) createAgent(w http.ResponseWriter, r *http.Request) {
 	a.ID = id
 	c := adminFrom(r)
 	_ = s.writeAudit(ctx, c, "agent.create", fmt.Sprintf("agent:%d", id), "", jsonOf(agentJSON(a)), clientIP(r))
-	writeData(w, agentJSON(a))
+	out := agentJSON(a)
+	out["login_link"] = s.agentInviteLink(slug)
+	writeData(w, out)
 }
 
 type updateAgentReq struct {
