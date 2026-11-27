@@ -20,7 +20,7 @@ func TestAnalyticsEndpoints(t *testing.T) {
 	if code != http.StatusOK {
 		t.Fatalf("管理端 analytics: %d %s", code, body)
 	}
-	if !strings.Contains(body, `"cards_total":1`) || !strings.Contains(body, `"by_kind":[{"key":`) {
+	if !strings.Contains(body, `"cards_total":1`) || !strings.Contains(body, `"by_kind":[{"key":`) || !strings.Contains(body, `"geo":`) {
 		t.Fatalf("管理端 analytics 内容不对: %s", body)
 	}
 

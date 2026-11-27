@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { NAlert, NButton, NCard, NRadioButton, NRadioGroup } from 'naive-ui'
 import BarList from '../components/charts/BarList.vue'
 import DonutChart from '../components/charts/DonutChart.vue'
+import ProvinceMap from '../components/charts/ProvinceMap.vue'
 import TrendChart from '../components/charts/TrendChart.vue'
 import { api } from '../api'
 import { formatTs, formatYuan, kindLabels, statusLabels } from '../utils'
@@ -27,6 +28,7 @@ interface Analytics {
   online_sessions: number
   activations_day: number
   active_devices: number
+  geo: { province: string; logins: number; ips: number; abroad: boolean }[]
   server_time: number
 }
 
@@ -105,6 +107,15 @@ const agentItems = computed(() =>
   (data.value?.top_agents ?? []).map((a) => ({ label: a.name, value: a.count, color: '#6366f1' })),
 )
 
+const geoItems = computed(() =>
+  (data.value?.geo ?? []).filter((g) => !g.abroad && g.province !== '未知'),
+)
+const geoTop = computed(() =>
+  geoItems.value
+    .slice(0, 10)
+    .map((g) => ({ label: g.province, value: g.logins, hint: `${g.ips} 个 IP`, color: '#06b6d4' })),
+)
+
 const hasTraffic = computed(() => periodLogins.value + periodActivations.value > 0)
 const hasMoney = computed(() => series.value.some((t) => t.issued_cents > 0))
 
@@ -165,6 +176,17 @@ onMounted(load)
         <template #header><span class="card-title">卡类型分布</span></template>
         <DonutChart v-if="kindItems.length" :items="kindItems" />
         <div v-else class="empty">还没有卡密。</div>
+      </n-card>
+
+      <n-card size="small" class="span-8">
+        <template #header><span class="card-title">登录来源省份</span></template>
+        <div v-if="geoItems.length === 0" class="empty">这段时间还没有带 IP 的登录记录。</div>
+        <ProvinceMap v-else :items="data?.geo ?? []" />
+      </n-card>
+
+      <n-card size="small" class="span-4">
+        <template #header><span class="card-title">省份排行</span></template>
+        <BarList :items="geoTop" unit=" 次" />
       </n-card>
 
       <n-card size="small" class="span-6">

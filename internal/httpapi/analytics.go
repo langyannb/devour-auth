@@ -1,8 +1,12 @@
 package httpapi
 
 import (
+	"context"
 	"net/http"
+	"sort"
 	"time"
+
+	"github.com/langyannb/devour-auth/internal/geo"
 )
 
 // analyticsDays 数据大屏的时间窗口：7–90 天，默认 30。
@@ -58,6 +62,11 @@ func (s *Server) adminAnalytics(w http.ResponseWriter, r *http.Request) {
 		internalErr(w, s.log, "查活跃设备失败", err)
 		return
 	}
+	geoStats, err := s.provinceStats(ctx, appID, since)
+	if err != nil {
+		internalErr(w, s.log, "查省份分布失败", err)
+		return
+	}
 	writeData(w, map[string]any{
 		"days":            days,
 		"trend":           trend,
@@ -70,8 +79,54 @@ func (s *Server) adminAnalytics(w http.ResponseWriter, r *http.Request) {
 		"online_sessions": st.OnlineSessions,
 		"activations_day": st.ActivationsDay,
 		"active_devices":  activeDevices,
+		"geo":             geoStats,
 		"server_time":     now.Unix(),
 	})
+}
+
+// ProvinceStat 一个省份的登录与 IP 数。
+type ProvinceStat struct {
+	Province string `json:"province"`
+	Logins   int64  `json:"logins"`
+	IPs      int64  `json:"ips"`
+	Abroad   bool   `json:"abroad"`
+}
+
+// provinceStats 把来源 IP 解析成省份（离线库，查不到归「未知」）。
+func (s *Server) provinceStats(ctx context.Context, appID, since int64) ([]ProvinceStat, error) {
+	ips, err := s.st.LoginIPCounts(ctx, appID, since)
+	if err != nil {
+		return nil, err
+	}
+	byKey := map[string]*ProvinceStat{}
+	for _, x := range ips {
+		province, _, abroad := geo.LookupFull(x.IP)
+		name := geo.ShortProvince(province)
+		switch {
+		case province == "":
+			name = "未知"
+		case name == "":
+			name = province
+		}
+		st := byKey[name]
+		if st == nil {
+			st = &ProvinceStat{Province: name, Abroad: abroad}
+			byKey[name] = st
+		}
+		st.Logins += x.Logins
+		st.IPs++
+	}
+	out := make([]ProvinceStat, 0, len(byKey))
+	for _, st := range byKey {
+		out = append(out, *st)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Logins != out[j].Logins {
+			return out[i].Logins > out[j].Logins
+		}
+		return out[i].Province < out[j].Province
+	})
+	return out, nil
 }
 
 // agentAnalytics 代理端数据：自己与下级范围内的出卡趋势与分布。

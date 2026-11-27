@@ -120,6 +120,42 @@ func (s *Store) AgentDailyCards(ctx context.Context, ids []int64, since int64) (
 	return out, nil
 }
 
+// IPCount 一个来源 IP 的登录次数。
+type IPCount struct {
+	IP     string `json:"ip"`
+	Logins int64  `json:"logins"`
+}
+
+// LoginIPCounts 区间内按 IP 汇总登录次数（数据看板做省份分布用）。
+func (s *Store) LoginIPCounts(ctx context.Context, appID, since int64) ([]IPCount, error) {
+	q := `SELECT e.ip, COUNT(*) FROM events e`
+	var args []any
+	if appID > 0 {
+		q += ` JOIN cards c ON c.id = e.card_id`
+	}
+	q += ` WHERE e.kind = 'login' AND e.ts >= ? AND e.ip != ''`
+	args = append(args, since)
+	if appID > 0 {
+		q += ` AND c.app_id = ?`
+		args = append(args, appID)
+	}
+	q += ` GROUP BY e.ip ORDER BY 2 DESC`
+	rows, err := s.db.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []IPCount{}
+	for rows.Next() {
+		var x IPCount
+		if err := rows.Scan(&x.IP, &x.Logins); err != nil {
+			return nil, err
+		}
+		out = append(out, x)
+	}
+	return out, rows.Err()
+}
+
 // ActiveDevices 区间内活跃过的设备数（按最后活跃时间）。
 func (s *Store) ActiveDevices(ctx context.Context, appID, since int64) (int64, error) {
 	var n int64
