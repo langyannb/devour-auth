@@ -91,8 +91,8 @@ async function unbind() {
       err.value = body.message ?? '解绑失败'
       return
     }
-    notice.value = '已解绑全部设备，下次登录会重新绑定当前设备'
     await query()
+    notice.value = '已解绑全部设备，下次登录会重新绑定当前设备'
   } catch {
     err.value = '网络错误，请稍后再试'
   } finally {
