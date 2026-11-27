@@ -7,6 +7,7 @@ import {
 } from 'naive-ui'
 import { api, authed } from '../api'
 import { useMobile } from '../useMobile'
+import ReauthDialog from './ReauthDialog.vue'
 
 const router = useRouter()
 const isMobile = useMobile()
@@ -18,6 +19,7 @@ const menu = computed<MenuOption[]>(() => [
   { label: '卡密', key: '/cards' },
   { label: '发卡', key: '/issue' },
   { label: '卡类型', key: '/policies' },
+  { label: '代理', key: '/agents' },
   { label: '运营', key: '/ops' },
   { label: '审计', key: '/audit' },
   { label: '设置', key: '/settings' },
@@ -78,4 +80,5 @@ const active = computed(() => router.currentRoute.value.path)
       <router-view />
     </main>
   </div>
+  <ReauthDialog />
 </template>

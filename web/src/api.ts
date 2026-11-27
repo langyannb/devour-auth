@@ -3,6 +3,20 @@ import { ref } from 'vue'
 export const authed = ref(false)
 export const agentAuthed = ref(false)
 
+// 敏感操作需要 5 分钟内重新验证；请求层遇到 403 就挂起等用户验证完再重试一次。
+export const reauthState = {
+  show: ref(false),
+  message: ref(''),
+  pending: null as null | ((ok: boolean) => void),
+}
+
+export function resolveReauth(ok: boolean) {
+  const p = reauthState.pending
+  reauthState.pending = null
+  reauthState.show.value = false
+  if (p) p(ok)
+}
+
 export class ApiError extends Error {
   constructor(public code: string, message: string) {
     super(message)
@@ -25,7 +39,7 @@ export function setCSRF(v: string, scope: Scope = 'admin'): void {
 
 type Body = { ok: boolean; code?: string; message?: string; data?: unknown }
 
-async function request<T>(path: string, init: RequestInit = {}, scope: Scope = 'admin'): Promise<T> {
+async function request<T>(path: string, init: RequestInit = {}, scope: Scope = 'admin', retried = false): Promise<T> {
   const method = (init.method ?? 'GET').toUpperCase()
   const headers: Record<string, string> = {}
   if (init.body) headers['Content-Type'] = 'application/json'
@@ -43,6 +57,15 @@ async function request<T>(path: string, init: RequestInit = {}, scope: Scope = '
   }))) as Body
 
   if (!body.ok) {
+    // 需要 reauth：弹窗验证后重试一次
+    if (scope === 'admin' && !retried && body.message?.includes('重新验证')) {
+      const ok = await new Promise<boolean>((resolve) => {
+        reauthState.message.value = '这个操作需要重新验证身份'
+        reauthState.pending = resolve
+        reauthState.show.value = true
+      })
+      if (ok) return request<T>(path, init, scope, true)
+    }
     if (body.code === 'UNAUTHORIZED') {
       if (scope === 'agent') agentAuthed.value = false
       else authed.value = false

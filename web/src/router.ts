@@ -20,6 +20,7 @@ const adminRoutes: RouteRecordRaw[] = [
       { path: 'cards', component: () => import('./views/Cards.vue') },
       { path: 'issue', component: () => import('./views/Issue.vue') },
       { path: 'policies', component: () => import('./views/Policies.vue') },
+      { path: 'agents', component: () => import('./views/Agents.vue') },
       { path: 'ops', component: () => import('./views/Ops.vue') },
       { path: 'audit', component: () => import('./views/Audit.vue') },
       { path: 'settings', component: () => import('./views/Settings.vue') },

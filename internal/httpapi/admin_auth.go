@@ -116,6 +116,10 @@ func (s *Server) adminLogin(w http.ResponseWriter, r *http.Request) {
 	if err := s.st.RevokeOtherAdminSessions(ctx, a.ID, sessID, now.Unix()); err != nil {
 		s.log.Error("踢旧会话失败", "err", err)
 	}
+	// 登录本身已经验过密码 + TOTP，5 分钟内做敏感操作不必重复验证
+	if err := s.st.SetAdminReauth(ctx, sessID, now.Add(reauthWindow).Unix()); err != nil {
+		s.log.Error("设置 reauth 窗口失败", "err", err)
+	}
 
 	s.lim.Reset("admin:login:acct:" + req.Username)
 	s.setAdminCookie(w, token, expires)
