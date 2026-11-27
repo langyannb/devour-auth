@@ -366,6 +366,14 @@ func (s *Server) agentSubagents(w http.ResponseWriter, r *http.Request) {
 	me["is_self"] = true
 	out = append(out, me)
 	for _, a := range subs {
+		// 老数据没有专属链接：列出来时补一个，父级点「登录链接」就能拿到
+		if a.LoginSlug == "" {
+			if slug, err := newAgentSlug(); err == nil {
+				if err := s.st.SetAgentLoginSlug(ctx, a.ID, slug); err == nil {
+					a.LoginSlug = slug
+				}
+			}
+		}
 		m := agentJSON(a)
 		m["login_link"] = s.agentInviteLink(a.LoginSlug)
 		m["activated"] = a.PasswordSet == 1
