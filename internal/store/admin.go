@@ -9,6 +9,9 @@ import (
 // ErrNotFound 记录不存在。
 var ErrNotFound = errors.New("not found")
 
+// ErrConflict 唯一约束冲突。
+var ErrConflict = errors.New("conflict")
+
 type Admin struct {
 	ID          int64
 	Username    string

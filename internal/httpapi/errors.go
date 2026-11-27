@@ -4,24 +4,26 @@ import (
 	"encoding/json"
 	"net/http"
 	"time"
+
+	"github.com/langyannb/devour-auth/internal/apierr"
 )
 
-// 对外错误码，design.md 第 12 节。不把内部错误透传给客户端。
+// 对外错误码，定义在 apierr，这里只是别名方便 httpapi 内部使用。
 const (
-	CodeBadInput           = "BAD_INPUT"
-	CodeCardNotFound       = "CARD_NOT_FOUND"
-	CodeCardExpired        = "CARD_EXPIRED"
-	CodeCardBanned         = "CARD_BANNED"
-	CodeCardExhausted      = "CARD_EXHAUSTED"
-	CodeDeviceLimit        = "DEVICE_LIMIT"
-	CodeDeviceMismatch     = "DEVICE_MISMATCH"
-	CodeUnauthorized       = "UNAUTHORIZED"
-	CodeRevoked            = "REVOKED"
-	CodePaused             = "PAUSED"
-	CodeEntitlementMissing = "ENTITLEMENT_MISSING"
-	CodeRateLimited        = "RATE_LIMITED"
-	CodeMaintenance        = "MAINTENANCE"
-	CodeInternal           = "INTERNAL"
+	CodeBadInput           = apierr.BadInput
+	CodeCardNotFound       = apierr.CardNotFound
+	CodeCardExpired        = apierr.CardExpired
+	CodeCardBanned         = apierr.CardBanned
+	CodeCardExhausted      = apierr.CardExhausted
+	CodeDeviceLimit        = apierr.DeviceLimit
+	CodeDeviceMismatch     = apierr.DeviceMismatch
+	CodeUnauthorized       = apierr.Unauthorized
+	CodeRevoked            = apierr.Revoked
+	CodePaused             = apierr.Paused
+	CodeEntitlementMissing = apierr.EntitlementMissing
+	CodeRateLimited        = apierr.RateLimited
+	CodeMaintenance        = apierr.Maintenance
+	CodeInternal           = apierr.Internal
 )
 
 type errorBody struct {

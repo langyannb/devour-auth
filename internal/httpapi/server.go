@@ -7,26 +7,29 @@ import (
 
 	"github.com/langyannb/devour-auth/internal/auth"
 	"github.com/langyannb/devour-auth/internal/card"
+	"github.com/langyannb/devour-auth/internal/clientauth"
 	"github.com/langyannb/devour-auth/internal/store"
 )
 
 type Server struct {
-	st    *store.Store
-	cards *card.Service
-	log   *slog.Logger
-	env   string
-	lim   *auth.Limiter
-	now   func() time.Time
+	st      *store.Store
+	cards   *card.Service
+	clients *clientauth.Service
+	log     *slog.Logger
+	env     string
+	lim     *auth.Limiter
+	now     func() time.Time
 }
 
 func New(st *store.Store, log *slog.Logger, env string) *Server {
 	return &Server{
-		st:    st,
-		cards: card.New(st),
-		log:   log,
-		env:   env,
-		lim:   auth.NewLimiter(),
-		now:   time.Now,
+		st:      st,
+		cards:   card.New(st),
+		clients: clientauth.New(st),
+		log:     log,
+		env:     env,
+		lim:     auth.NewLimiter(),
+		now:     time.Now,
 	}
 }
 
@@ -61,6 +64,12 @@ func (s *Server) Handler() http.Handler {
 
 	// 审计
 	mux.HandleFunc("GET /admin/api/audit", s.requireAdmin(s.listAudit))
+
+	// 客户端协议（design.md 第 12 节）
+	mux.HandleFunc("POST /v1/auth/login", s.clientLogin)
+	mux.HandleFunc("POST /v1/auth/refresh", s.clientRefresh)
+	mux.HandleFunc("POST /v1/auth/logout", s.clientLogout)
+	mux.HandleFunc("GET /v1/session", s.clientSession)
 
 	// 未匹配路径也走统一错误体（JSON 端点，不返回 HTML）。
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {

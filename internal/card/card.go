@@ -51,6 +51,11 @@ type Snapshot struct {
 	PolicyID           int64    `json:"policy_id"`
 	PolicyCode         string   `json:"policy_code"`
 	Kind               string   `json:"kind"`
+	DurationDays       int64    `json:"duration_days"`
+	DurationHours      int64    `json:"duration_hours"`
+	DurationSeconds    int64    `json:"duration_seconds"`
+	InitialTimes       int64    `json:"initial_times"`
+	InitialPoints      int64    `json:"initial_points"`
 	DeviceLimit        int64    `json:"device_limit"`
 	ConcurrentLimit    int64    `json:"concurrent_limit"`
 	HeartbeatSec       int64    `json:"heartbeat_sec"`
@@ -73,6 +78,11 @@ func BuildSnapshot(p store.Policy, entitlementCodes []string) Snapshot {
 		PolicyID:           p.ID,
 		PolicyCode:         p.Code,
 		Kind:               p.Kind,
+		DurationDays:       p.DurationDays,
+		DurationHours:      p.DurationHours,
+		DurationSeconds:    p.DurationSeconds,
+		InitialTimes:       p.InitialTimes,
+		InitialPoints:      p.InitialPoints,
 		DeviceLimit:        p.DeviceLimit,
 		ConcurrentLimit:    p.ConcurrentLimit,
 		HeartbeatSec:       p.HeartbeatSec,
@@ -86,6 +96,11 @@ func BuildSnapshot(p store.Policy, entitlementCodes []string) Snapshot {
 		PriceCents:         p.PriceCents,
 		Entitlements:       entitlementCodes,
 	}
+}
+
+// TotalSeconds 快照里的总时长（duration / trial 用）。
+func (s Snapshot) TotalSeconds() int64 {
+	return s.DurationDays*86400 + s.DurationHours*3600 + s.DurationSeconds
 }
 
 // initialBalance 按 kind 给出 0 态的余额（design.md 第 7 节表格）。

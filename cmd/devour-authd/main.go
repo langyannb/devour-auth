@@ -29,8 +29,10 @@ func main() {
 		err = run()
 	case "init-admin":
 		err = runInitAdmin(config.Load())
+	case "verify-audit":
+		err = runVerifyAudit(config.Load())
 	default:
-		fmt.Fprintf(os.Stderr, "用法: %s [serve|init-admin]\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "用法: %s [serve|init-admin|verify-audit]\n", os.Args[0])
 		os.Exit(2)
 	}
 
