@@ -20,13 +20,13 @@ func (s *Server) queryCaptcha(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Cache-Control", "no-store")
-	writeJSON(w, http.StatusOK, map[string]any{"id": id, "image": img})
+	writeData(w, map[string]any{"id": id, "image": img})
 }
 
 // defaultQueryCaptcha 内置实现：库自带的内存 store，2 分钟过期。
 func defaultQueryCaptcha() (func() (id, img string), func(id, code string) bool) {
 	c := base64Captcha.NewCaptcha(
-		base64Captcha.NewDriverDigit(60, 240, 4, 0.7, 60),
+		base64Captcha.NewDriverDigit(100, 320, 4, 0.2, 5),
 		base64Captcha.NewMemoryStore(base64Captcha.GCLimitNumber, 2*time.Minute),
 	)
 	newFn := func() (string, string) {

@@ -50,14 +50,16 @@ func TestQueryCaptchaDefaultImplementation(t *testing.T) {
 	if code != http.StatusOK {
 		t.Fatalf("默认验证码接口应 200，得到 %d %s", code, body)
 	}
-	var got captchaResp
+	var got struct {
+		Data captchaResp `json:"data"`
+	}
 	if err := json.Unmarshal([]byte(body), &got); err != nil {
 		t.Fatalf("解析失败: %v %s", err, body)
 	}
-	if got.ID == "" {
+	if got.Data.ID == "" {
 		t.Fatalf("缺少 id: %s", body)
 	}
-	raw, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(got.Image, "data:image/png;base64,"))
+	raw, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(got.Data.Image, "data:image/png;base64,"))
 	if err != nil || !bytes.HasPrefix(raw, []byte("\x89PNG")) {
 		t.Fatalf("内置实现未返回 PNG: %v", err)
 	}
@@ -73,15 +75,17 @@ func TestQueryCaptchaIssued(t *testing.T) {
 	if code != http.StatusOK {
 		t.Fatalf("验证码接口应 200，得到 %d %s", code, body)
 	}
-	var got captchaResp
+	var got struct {
+		Data captchaResp `json:"data"`
+	}
 	if err := json.Unmarshal([]byte(body), &got); err != nil {
 		t.Fatalf("解析失败: %v %s", err, body)
 	}
-	if got.ID == "" {
+	if got.Data.ID == "" {
 		t.Fatalf("缺少 id: %s", body)
 	}
-	if !strings.HasPrefix(got.Image, "data:image/png;base64,") {
-		t.Fatalf("图片不是 data URI: %s", got.Image)
+	if !strings.HasPrefix(got.Data.Image, "data:image/png;base64,") {
+		t.Fatalf("图片不是 data URI: %s", got.Data.Image)
 	}
 }
 
@@ -133,11 +137,13 @@ func TestQueryCaptchaRequired(t *testing.T) {
 
 	// 正常签发 → 对码，应 200
 	_, raw := e.do(t, &http.Client{}, http.MethodGet, "/v1/query/captcha", "", "9.9.9.4", "")
-	var issued captchaResp
+	var issued struct {
+		Data captchaResp `json:"data"`
+	}
 	if err := json.Unmarshal([]byte(raw), &issued); err != nil {
 		t.Fatal(err)
 	}
-	okBody := fmt.Sprintf(`{"kami":"DV-CAP-TEST","captcha_id":%q,"captcha_code":"1234"}`, issued.ID)
+	okBody := fmt.Sprintf(`{"kami":"DV-CAP-TEST","captcha_id":%q,"captcha_code":"1234"}`, issued.Data.ID)
 	if code, body = ask("9.9.9.4", okBody); code != http.StatusOK {
 		t.Fatalf("对码应 200，得到 %d %s", code, body)
 	}
