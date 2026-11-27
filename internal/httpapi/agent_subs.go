@@ -160,9 +160,7 @@ func (s *Server) agentSubPlan(w http.ResponseWriter, r *http.Request) {
 		}
 		base, hasParent := parentPlan.Items[kind]
 		if !hasParent {
-			writeErr(w, http.StatusBadRequest, CodeBadInput,
-				fmt.Sprintf("你的模板没有「%s」，不能给下级开", planKindName(kind)))
-			return
+			continue // 自己没有这一档，不设下限，由代理自己定价
 		}
 		if childPrice < base {
 			writeErr(w, http.StatusBadRequest, CodeBadInput,
