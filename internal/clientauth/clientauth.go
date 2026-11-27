@@ -89,6 +89,8 @@ type CardView struct {
 	Paused           bool   `json:"paused"`
 	DeviceLimit      int64  `json:"device_limit"`
 	BoundDevices     int64  `json:"bound_devices"`
+	// 心跳间隔（秒）：客户端按它决定多久发一次 /v1/session。
+	HeartbeatSec int64 `json:"heartbeat_sec"`
 }
 
 type EntitlementView struct {
@@ -288,7 +290,7 @@ func (s *Service) Login(ctx context.Context, req LoginReq, ip, ua string) (Sessi
 	if err != nil {
 		return SessionView{}, err
 	}
-	view.Card = viewOf(row, snap.DeviceLimit, bound)
+	view.Card = viewOf(row, snap.DeviceLimit, bound, snap.HeartbeatSec)
 	view.Entitlements = entViews(ents)
 
 	if err := s.st.InsertEventTx(ctx, tx, store.Event{
@@ -404,7 +406,7 @@ func (s *Service) Status(ctx context.Context, accessToken, ip, ua string) (Sessi
 	}
 
 	view := SessionView{
-		Card:         viewOf(row, snap.DeviceLimit, bound),
+		Card:         viewOf(row, snap.DeviceLimit, bound, snap.HeartbeatSec),
 		Entitlements: entViews(ents),
 		ServerTime:   now.Unix(),
 	}
@@ -503,7 +505,7 @@ func (s *Service) Refresh(ctx context.Context, refreshToken, ip, ua string) (Ses
 	if err != nil {
 		return SessionView{}, err
 	}
-	view.Card = viewOf(row, snap.DeviceLimit, bound)
+	view.Card = viewOf(row, snap.DeviceLimit, bound, snap.HeartbeatSec)
 	view.Entitlements = entViews(ents)
 
 	if err := s.st.InsertEventTx(ctx, tx, store.Event{
@@ -711,7 +713,7 @@ func (s *Service) Pause(ctx context.Context, accessToken string, paused bool, ip
 		return SessionView{}, err
 	}
 	return SessionView{
-		Card:         viewOf(row, snap.DeviceLimit, bound),
+		Card:         viewOf(row, snap.DeviceLimit, bound, snap.HeartbeatSec),
 		Entitlements: entViews(ents),
 		ServerTime:   now.Unix(),
 	}, nil
@@ -847,7 +849,10 @@ func liveStatus(c store.Card, now int64) string {
 	return store.CardUnused
 }
 
-func viewOf(c store.Card, deviceLimit, bound int64) CardView {
+func viewOf(c store.Card, deviceLimit, bound, heartbeat int64) CardView {
+	if heartbeat <= 0 {
+		heartbeat = 600
+	}
 	return CardView{
 		Kind:             c.Kind,
 		ExpireAt:         c.ExpireAt,
@@ -857,6 +862,7 @@ func viewOf(c store.Card, deviceLimit, bound int64) CardView {
 		Paused:           c.Paused == 1,
 		DeviceLimit:      deviceLimit,
 		BoundDevices:     bound,
+		HeartbeatSec:     heartbeat,
 	}
 }
 

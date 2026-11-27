@@ -147,7 +147,8 @@ curl 'https://net.namikao.com/v1/meta?app=friend'
     "card": {
       "kind": "duration", "expire_at": 1798301714,
       "points": 0, "remain_times": 0, "remaining_seconds": 0,
-      "paused": false, "device_limit": 2, "bound_devices": 1
+      "paused": false, "device_limit": 2, "bound_devices": 1,
+      "heartbeat_sec": 600
     },
     "entitlements": [
       { "code": "basic", "cost_points": 0, "cost_times": 0 },
@@ -170,7 +171,7 @@ curl -H 'Authorization: Bearer <access_token>' https://net.namikao.com/v1/sessio
 
 返回结构和登录的 `data` 一样（卡状态、余额、权限、`server_time`）。
 
-- 建议每 **10 分钟**一次；服务端 12 分钟收不到算离线。
+- 间隔用登录返回的 `card.heartbeat_sec`（默认 600 秒）；服务端 12 分钟收不到算离线。
 - 计时卡（`kind: "timed"`）在这里扣秒，客户端上报的时长服务端不采信。
 - 暂停中返回 HTTP 200 + `{"ok":false,"code":"PAUSED","data":{...}}`：客户端要关掉全部功能。
 - 会话被吊销/过期返回 401，按 `code` 处理（`REVOKED` 要提示重新登录）。
