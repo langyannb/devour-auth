@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/langyannb/devour-auth/internal/auth"
+	"github.com/langyannb/devour-auth/internal/store"
 )
 
 const codeAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
@@ -36,6 +37,15 @@ func newRecoveryCodes() (plain []string, hashes []string, err error) {
 	return plain, hashes, nil
 }
 
+func accountRow(a store.AdminAccount) map[string]any {
+	return map[string]any{
+		"id": a.ID, "username": a.Username, "role": a.Role,
+		"totp_enabled": a.TotpEnabled, "ip_allow": a.IPAllow,
+		"locked_until": a.LockedUntil,
+		"created_at":   a.CreatedAt, "unused_recovery_codes": a.UnusedCodes,
+	}
+}
+
 func (s *Server) listAccounts(w http.ResponseWriter, r *http.Request) {
 	list, err := s.st.ListAdminAccounts(r.Context())
 	if err != nil {
@@ -44,11 +54,7 @@ func (s *Server) listAccounts(w http.ResponseWriter, r *http.Request) {
 	}
 	out := make([]map[string]any, 0, len(list))
 	for _, a := range list {
-		out = append(out, map[string]any{
-			"id": a.ID, "username": a.Username, "role": a.Role,
-			"totp_enabled": a.TotpEnabled, "locked_until": a.LockedUntil,
-			"created_at": a.CreatedAt, "unused_recovery_codes": a.UnusedCodes,
-		})
+		out = append(out, accountRow(a))
 	}
 	writeData(w, out)
 }

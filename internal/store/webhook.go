@@ -90,5 +90,54 @@ func (s *Store) WebhooksFor(ctx context.Context, appID int64, event string) ([]W
 	return out, rows.Err()
 }
 
+// WebhookDelivery 一次投递的最终结果；url 是快照，webhook 删除后仍可追溯。
+type WebhookDelivery struct {
+	ID         int64
+	WebhookID  int64
+	Event      string
+	URL        string
+	Attempts   int
+	OK         bool
+	StatusCode int
+	Error      string
+	CreatedAt  int64
+	FinishedAt int64
+}
+
+func (s *Store) CreateWebhookDelivery(ctx context.Context, d WebhookDelivery) error {
+	ok := 0
+	if d.OK {
+		ok = 1
+	}
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO webhook_deliveries(webhook_id, event, url, attempts, ok, status_code, error, created_at, finished_at)
+		 VALUES(?,?,?,?,?,?,?,?,?)`,
+		d.WebhookID, d.Event, d.URL, d.Attempts, ok, d.StatusCode, d.Error, d.CreatedAt, d.FinishedAt)
+	return err
+}
+
+// ListWebhookDeliveries 最近的投递记录，按时间倒序。
+func (s *Store) ListWebhookDeliveries(ctx context.Context, limit int) ([]WebhookDelivery, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, webhook_id, event, url, attempts, ok, status_code, error, created_at, finished_at
+		   FROM webhook_deliveries ORDER BY id DESC LIMIT ?`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []WebhookDelivery
+	for rows.Next() {
+		var d WebhookDelivery
+		var ok int
+		if err := rows.Scan(&d.ID, &d.WebhookID, &d.Event, &d.URL, &d.Attempts, &ok,
+			&d.StatusCode, &d.Error, &d.CreatedAt, &d.FinishedAt); err != nil {
+			return nil, err
+		}
+		d.OK = ok == 1
+		out = append(out, d)
+	}
+	return out, rows.Err()
+}
+
 var _ = errors.Is
 var _ = sql.ErrNoRows

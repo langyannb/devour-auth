@@ -11,7 +11,6 @@ const kinds = [
   { key: 'week', label: '周卡（7 天）' },
   { key: 'month', label: '月卡（30 天）' },
   { key: 'forever', label: '永久卡' },
-  { key: 'custom', label: '自定义时间' },
 ]
 
 const plans = ref<Plan[]>([])

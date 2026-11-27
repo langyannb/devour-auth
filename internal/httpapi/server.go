@@ -26,26 +26,31 @@ type Options struct {
 	DBPath     string
 	ListenAddr string
 	Notifier   card.Notifier
+	// CaptchaNew / CaptchaVerify 可选钩子：测试注入用，nil 时走内置图形验证码。
+	CaptchaNew    func() (id, img string)
+	CaptchaVerify func(id, code string) bool
 }
 
 type Server struct {
-	st         *store.Store
-	cards      *card.Service
-	clients    *clientauth.Service
-	agents     *agent.Service
-	static     fs.FS
-	ticketKey  ed25519.PrivateKey
-	log        *slog.Logger
-	env        string
-	adminHost  string
-	agentHost  string
-	netHost    string
-	backupDir  string
-	dbPath     string
-	listenAddr string
-	lim        *auth.Limiter
-	openNonces *auth.Limiter
-	now        func() time.Time
+	st            *store.Store
+	cards         *card.Service
+	clients       *clientauth.Service
+	agents        *agent.Service
+	static        fs.FS
+	ticketKey     ed25519.PrivateKey
+	log           *slog.Logger
+	env           string
+	adminHost     string
+	agentHost     string
+	netHost       string
+	backupDir     string
+	dbPath        string
+	listenAddr    string
+	lim           *auth.Limiter
+	openNonces    *auth.Limiter
+	captchaNew    func() (id, img string)
+	captchaVerify func(id, code string) bool
+	now           func() time.Time
 }
 
 func New(st *store.Store, log *slog.Logger, opt Options) *Server {
@@ -53,24 +58,36 @@ func New(st *store.Store, log *slog.Logger, opt Options) *Server {
 	if opt.Notifier != nil {
 		cardSvc.SetNotifier(opt.Notifier)
 	}
+	captchaNew, captchaVerify := opt.CaptchaNew, opt.CaptchaVerify
+	if captchaNew == nil || captchaVerify == nil {
+		newFn, verifyFn := defaultQueryCaptcha()
+		if captchaNew == nil {
+			captchaNew = newFn
+		}
+		if captchaVerify == nil {
+			captchaVerify = verifyFn
+		}
+	}
 	return &Server{
-		st:         st,
-		cards:      cardSvc,
-		clients:    clientauth.New(st),
-		agents:     agent.New(st),
-		static:     opt.Static,
-		ticketKey:  opt.TicketKey,
-		log:        log,
-		env:        opt.Env,
-		adminHost:  opt.AdminHost,
-		agentHost:  opt.AgentHost,
-		netHost:    opt.NetHost,
-		backupDir:  opt.BackupDir,
-		dbPath:     opt.DBPath,
-		listenAddr: opt.ListenAddr,
-		lim:        auth.NewLimiter(),
-		openNonces: auth.NewLimiter(),
-		now:        time.Now,
+		st:            st,
+		cards:         cardSvc,
+		clients:       clientauth.New(st),
+		agents:        agent.New(st),
+		static:        opt.Static,
+		ticketKey:     opt.TicketKey,
+		log:           log,
+		env:           opt.Env,
+		adminHost:     opt.AdminHost,
+		agentHost:     opt.AgentHost,
+		netHost:       opt.NetHost,
+		backupDir:     opt.BackupDir,
+		dbPath:        opt.DBPath,
+		listenAddr:    opt.ListenAddr,
+		lim:           auth.NewLimiter(),
+		openNonces:    auth.NewLimiter(),
+		captchaNew:    captchaNew,
+		captchaVerify: captchaVerify,
+		now:           time.Now,
 	}
 }
 
@@ -85,6 +102,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /admin/api/accounts", s.requireAdmin(s.requireRole("admin", s.listAccounts)))
 	mux.HandleFunc("POST /admin/api/accounts", s.requireAdmin(s.requireRole("admin", s.createAccount)))
 	mux.HandleFunc("POST /admin/api/accounts/{id}/reset-password", s.requireAdmin(s.requireRole("admin", s.resetAccountPassword)))
+	mux.HandleFunc("PATCH /admin/api/accounts/{id}/ip", s.requireAdmin(s.requireRole("admin", s.requireReauth(s.setAccountIPAllow))))
 	mux.HandleFunc("POST /admin/api/reauth", s.requireAdmin(s.adminReauth))
 	mux.HandleFunc("POST /admin/api/me/totp/setup", s.requireAdmin(s.adminTOTPSetup))
 	mux.HandleFunc("POST /admin/api/me/totp/enable", s.requireAdmin(s.adminTOTPEnable))
@@ -210,6 +228,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /admin/api/webhooks", s.requireAdmin(s.createWebhook))
 	mux.HandleFunc("POST /admin/api/webhooks/{id}/toggle", s.requireAdmin(s.toggleWebhook))
 	mux.HandleFunc("DELETE /admin/api/webhooks/{id}", s.requireAdmin(s.deleteWebhook))
+	mux.HandleFunc("GET /admin/api/webhooks/deliveries", s.requireAdmin(s.listWebhookDeliveries))
+	mux.HandleFunc("GET /admin/api/ops/status", s.requireAdmin(s.opsStatus))
 	mux.HandleFunc("POST /admin/api/open/keys/{id}/disable", s.requireAdmin(s.setAPIKeyStatus(false)))
 	mux.HandleFunc("POST /admin/api/open/keys/{id}/enable", s.requireAdmin(s.setAPIKeyStatus(true)))
 
@@ -221,6 +241,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /v1/consume", s.clientConsume)
 	mux.HandleFunc("POST /v1/pause", s.clientPause)
 
+	mux.HandleFunc("GET /v1/query/captcha", s.queryCaptcha)
 	mux.HandleFunc("POST /v1/query", s.clientQuery)
 	mux.HandleFunc("POST /v1/query/unbind", s.clientQueryUnbind)
 

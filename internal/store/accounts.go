@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"errors"
 )
 
 type AdminAccount struct {
@@ -10,16 +11,18 @@ type AdminAccount struct {
 	Username    string
 	Role        string
 	TotpEnabled bool
+	IPAllow     string
 	LockedUntil int64
 	CreatedAt   int64
 	UnusedCodes int64
 }
 
+const adminAccountCols = `a.id, a.username, a.role, a.totp_secret IS NOT NULL, COALESCE(a.ip_allow, ''), a.locked_until, a.created_at,
+	(SELECT COUNT(*) FROM admin_recovery_codes r WHERE r.admin_id = a.id AND r.used_at IS NULL)`
+
 func (s *Store) ListAdminAccounts(ctx context.Context) ([]AdminAccount, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT a.id, a.username, a.role, a.totp_secret IS NOT NULL, a.locked_until, a.created_at,
-		        (SELECT COUNT(*) FROM admin_recovery_codes r WHERE r.admin_id = a.id AND r.used_at IS NULL)
-		   FROM admins a ORDER BY a.id`)
+		`SELECT `+adminAccountCols+` FROM admins a ORDER BY a.id`)
 	if err != nil {
 		return nil, err
 	}
@@ -27,12 +30,25 @@ func (s *Store) ListAdminAccounts(ctx context.Context) ([]AdminAccount, error) {
 	var out []AdminAccount
 	for rows.Next() {
 		var a AdminAccount
-		if err := rows.Scan(&a.ID, &a.Username, &a.Role, &a.TotpEnabled, &a.LockedUntil, &a.CreatedAt, &a.UnusedCodes); err != nil {
+		if err := rows.Scan(&a.ID, &a.Username, &a.Role, &a.TotpEnabled, &a.IPAllow,
+			&a.LockedUntil, &a.CreatedAt, &a.UnusedCodes); err != nil {
 			return nil, err
 		}
 		out = append(out, a)
 	}
 	return out, rows.Err()
+}
+
+func (s *Store) AdminAccountByID(ctx context.Context, id int64) (AdminAccount, error) {
+	var a AdminAccount
+	err := s.db.QueryRowContext(ctx,
+		`SELECT `+adminAccountCols+` FROM admins a WHERE a.id = ?`, id).
+		Scan(&a.ID, &a.Username, &a.Role, &a.TotpEnabled, &a.IPAllow,
+			&a.LockedUntil, &a.CreatedAt, &a.UnusedCodes)
+	if errors.Is(err, sql.ErrNoRows) {
+		return AdminAccount{}, ErrNotFound
+	}
+	return a, err
 }
 
 func (s *Store) AddRecoveryCodes(ctx context.Context, adminID int64, hashes []string) error {

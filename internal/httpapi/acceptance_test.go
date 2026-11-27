@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/langyannb/devour-auth/internal/auth"
+	"github.com/langyannb/devour-auth/internal/httpapi"
 	"github.com/langyannb/devour-auth/internal/store"
 )
 
@@ -103,7 +104,10 @@ func TestReauthRequiredForSensitiveOps(t *testing.T) {
 
 // 公开查卡页要能显示卡多长（天卡/周卡/月卡）。
 func TestClientQueryReturnsDuration(t *testing.T) {
-	e := setup(t)
+	newFn, verifyFn := fakeCaptcha()
+	e := setup(t, func(o *httpapi.Options) {
+		o.CaptchaNew, o.CaptchaVerify = newFn, verifyFn
+	})
 	c, csrf := e.login(t, "admin", "6.6.6.6")
 	if code, body := e.do(t, c, http.MethodPost, "/admin/api/cards/quick?app_id=1", csrf, "6.6.6.6",
 		`{"kind":"week","qty":1,"multiplier":1,"device_limit":1}`); code != http.StatusOK {
@@ -113,8 +117,9 @@ func TestClientQueryReturnsDuration(t *testing.T) {
 	if err := e.st.DB().QueryRow(`SELECT kami FROM cards ORDER BY id DESC LIMIT 1`).Scan(&kami); err != nil {
 		t.Fatal(err)
 	}
+	capID, _ := newFn()
 	code, body := e.do(t, &http.Client{}, http.MethodPost, "/v1/query", "", "6.6.6.6",
-		fmt.Sprintf(`{"kami":%q}`, kami))
+		fmt.Sprintf(`{"kami":%q,"captcha_id":%q,"captcha_code":"1234"}`, kami, capID))
 	if code != http.StatusOK {
 		t.Fatalf("查卡失败: %d %s", code, body)
 	}

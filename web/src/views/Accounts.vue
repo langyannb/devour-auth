@@ -4,7 +4,7 @@ import { NAlert, NButton, NDataTable, NForm, NFormItem, NInput, NModal, NSelect,
 import { api } from '../api'
 import { formatTs } from '../utils'
 
-interface Acc { id: number; username: string; role: string; totp_enabled: boolean; created_at: number; unused_recovery_codes: number }
+interface Acc { id: number; username: string; role: string; totp_enabled: boolean; ip_allow: string; created_at: number; unused_recovery_codes: number }
 
 const rows = ref<Acc[]>([])
 const err = ref('')
@@ -13,6 +13,10 @@ const loading = ref(false)
 const showCreate = ref(false)
 const busy = ref(false)
 const form = ref({ username: '', password: '', role: 'operator' })
+const showIP = ref(false)
+const ipTarget = ref<Acc | null>(null)
+const ipValue = ref('')
+const ipBusy = ref(false)
 const secrets = ref<{ username: string; password: string; codes: string[] } | null>(null)
 
 async function load() {
@@ -42,16 +46,41 @@ async function reset(a: Acc) {
   } catch (e) { err.value = (e as Error).message }
 }
 
+function editIP(a: Acc) {
+  err.value = ''
+  ipTarget.value = a
+  ipValue.value = a.ip_allow
+  showIP.value = true
+}
+
+async function saveIP() {
+  if (!ipTarget.value) return
+  err.value = ''
+  ipBusy.value = true
+  try {
+    await api.patch<Acc>(`/admin/api/accounts/${ipTarget.value.id}/ip`, { ip_allow: ipValue.value })
+    showIP.value = false
+    notice.value = 'IP 白名单已保存'
+    await load()
+  } catch (e) { err.value = (e as Error).message } finally { ipBusy.value = false }
+}
+
 const cols: DataTableColumns<Acc> = [
   { title: 'ID', key: 'id', width: 60 },
   { title: '用户名', key: 'username', width: 160 },
   { title: '角色', key: 'role', width: 100 },
   { title: 'TOTP', key: 'totp_enabled', width: 80, render: (r) => (r.totp_enabled ? '已启用' : '未启用') },
   { title: '恢复码剩余', key: 'unused_recovery_codes', width: 110 },
+  { title: 'IP 白名单', key: 'ip_allow', width: 200, ellipsis: { tooltip: true }, render: (r) => r.ip_allow || '不限' },
   { title: '创建', key: 'created_at', width: 150, render: (r) => formatTs(r.created_at) },
   {
-    title: '操作', key: 'op', width: 120,
-    render: (r) => h(NButton, { size: 'tiny', onClick: () => reset(r) }, { default: () => '重置密码' }),
+    title: '操作', key: 'op', width: 200,
+    render: (r) => h(NSpace, { size: 4 }, {
+      default: () => [
+        h(NButton, { size: 'tiny', onClick: () => editIP(r) }, { default: () => 'IP 白名单' }),
+        h(NButton, { size: 'tiny', onClick: () => reset(r) }, { default: () => '重置密码' }),
+      ],
+    }),
   },
 ]
 
@@ -91,6 +120,24 @@ onMounted(load)
           <n-input v-model:value="form.password" placeholder="留空则随机生成" />
         </n-form-item>
         <n-button type="primary" :loading="busy" block @click="create">创建</n-button>
+      </n-form>
+    </n-modal>
+
+    <n-modal v-model:show="showIP" preset="card" :title="`IP 白名单 — ${ipTarget?.username ?? ''}`" style="width: min(480px, 94vw)">
+      <n-form label-placement="top">
+        <n-form-item label="允许登录的 IP / CIDR">
+          <n-input
+            v-model:value="ipValue"
+            type="textarea"
+            :rows="3"
+            placeholder="1.2.3.4, 10.0.0.0/8"
+          />
+        </n-form-item>
+        <div style="font-size: 12px; color: #888; margin-bottom: 12px">
+          支持单个 IP 或 CIDR，用逗号或空格分隔；留空表示不限。
+          开启后只有名单内的地址能登录管理端，且不会因同网段而被放行。
+        </div>
+        <n-button type="primary" :loading="ipBusy" block @click="saveIP">保存</n-button>
       </n-form>
     </n-modal>
   </div>

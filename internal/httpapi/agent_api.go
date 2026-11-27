@@ -248,7 +248,10 @@ func (s *Server) agentPlan(w http.ResponseWriter, r *http.Request) {
 	}
 	items := make([]map[string]any, 0, len(plan.Items))
 	for kind, price := range plan.Items {
-		name := map[string]string{"day": "天卡", "week": "周卡", "month": "月卡", "forever": "永久卡", "custom": "自定义时间"}[kind]
+		if kind == "custom" { // 代理不能发自定义时间
+			continue
+		}
+		name := map[string]string{"day": "天卡", "week": "周卡", "month": "月卡", "forever": "永久卡"}[kind]
 		items = append(items, map[string]any{"kind": kind, "name": name, "price_cents": price})
 	}
 	writeData(w, map[string]any{

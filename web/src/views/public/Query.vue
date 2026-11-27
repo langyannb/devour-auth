@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { NAlert, NButton, NCard, NInput, NTag } from 'naive-ui'
 import { formatExpiry, cardKindLabel, statusLabels } from '../../utils'
 
@@ -17,6 +17,9 @@ interface QueryResult {
 }
 
 const kami = ref('')
+const captchaId = ref('')
+const captchaImg = ref('')
+const captchaCode = ref('')
 const result = ref<QueryResult | null>(null)
 const err = ref('')
 const notice = ref('')
@@ -47,6 +50,23 @@ const balance = computed(() => {
   return '—'
 })
 
+// 验证码一次有效：失败后必须换一张，成功查询后也换（下次查询要用）。
+async function loadCaptcha() {
+  captchaCode.value = ''
+  try {
+    const res = await fetch('/v1/query/captcha')
+    const body = await res.json()
+    if (body.id && body.image) {
+      captchaId.value = body.id
+      captchaImg.value = body.image
+    }
+  } catch {
+    // 拉取失败时保持旧图，查询会提示验证码错误
+  }
+}
+
+onMounted(loadCaptcha)
+
 async function query() {
   err.value = ''
   result.value = null
@@ -55,12 +75,20 @@ async function query() {
     err.value = '请输入卡密'
     return
   }
+  if (!captchaCode.value.trim()) {
+    err.value = '请输入验证码'
+    return
+  }
   busy.value = true
   try {
     const res = await fetch('/v1/query', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ kami: kami.value.trim() }),
+      body: JSON.stringify({
+        kami: kami.value.trim(),
+        captcha_id: captchaId.value,
+        captcha_code: captchaCode.value.trim(),
+      }),
     })
     const body = await res.json()
     if (!body.ok) {
@@ -72,6 +100,7 @@ async function query() {
     err.value = '网络错误，请稍后再试'
   } finally {
     busy.value = false
+    await loadCaptcha()
   }
 }
 
@@ -92,7 +121,8 @@ async function unbind() {
       err.value = body.message ?? '解绑失败'
       return
     }
-    await query()
+    // 解绑已成功；重新查卡需要新验证码，这里直接更新本地结果。
+    if (result.value) result.value.bound_devices = 0
     notice.value = '已解绑全部设备，下次登录会重新绑定当前设备'
   } catch {
     err.value = '网络错误，请稍后再试'
@@ -122,6 +152,24 @@ async function unbind() {
           @keyup.enter="query"
         />
         <n-button type="primary" size="large" :loading="busy" @click="query">查询</n-button>
+      </div>
+
+      <div class="captcha">
+        <n-input
+          v-model:value="captchaCode"
+          placeholder="图形验证码"
+          size="large"
+          :maxlength="4"
+          @keyup.enter="query"
+        />
+        <img
+          v-if="captchaImg"
+          :src="captchaImg"
+          class="captcha-img"
+          alt="验证码"
+          title="点击刷新"
+          @click="loadCaptcha"
+        />
       </div>
 
       <n-alert v-if="err" type="error" style="margin-top: 16px">{{ err }}</n-alert>
@@ -218,6 +266,25 @@ h1 {
 .form > :first-child {
   flex: 1;
   min-width: 220px;
+}
+.captcha {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+.captcha > :first-child {
+  flex: 1;
+  min-width: 120px;
+}
+.captcha-img {
+  height: 40px;
+  width: 120px;
+  object-fit: cover;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 1px solid rgba(18, 21, 28, 0.1);
+  background: #fff;
 }
 .row {
   display: flex;

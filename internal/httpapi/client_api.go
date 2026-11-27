@@ -290,17 +290,23 @@ func (s *Server) revokeCardEntitlement(w http.ResponseWriter, r *http.Request) {
 
 // ---------- 查卡（终端用户自助查询） ----------
 
-// clientQuery 凭卡密查状态与绑定数，不返回卡密本身，也不需要登录。
-// 设计要求的图形验证码尚未实现，先用按 IP 限流兜底。
+// clientQuery 凭卡密 + 图形验证码查状态与绑定数，不返回卡密本身，也不需要登录。
 func (s *Server) clientQuery(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Kami string `json:"kami"`
+		Kami        string `json:"kami"`
+		CaptchaID   string `json:"captcha_id"`
+		CaptchaCode string `json:"captcha_code"`
 	}
 	if !decode(w, r, &req) {
 		return
 	}
 	if strings.TrimSpace(req.Kami) == "" {
 		writeErr(w, http.StatusBadRequest, CodeBadInput, "请输入卡密")
+		return
+	}
+	// 验证码先于查卡限流：错码不占用正常用户的查询额度。
+	if req.CaptchaID == "" || req.CaptchaCode == "" || !s.captchaVerify(req.CaptchaID, req.CaptchaCode) {
+		writeErr(w, http.StatusBadRequest, CodeBadInput, "验证码错误")
 		return
 	}
 	ip := clientIP(r)

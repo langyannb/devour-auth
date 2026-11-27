@@ -104,6 +104,16 @@ func (s *Server) adminLogin(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// 登录 IP 白名单在密码 + TOTP 都通过后、建会话前判定（design.md 16.4）。
+	// 精确匹配声明的 IP / CIDR，不复用会话绑定的 /24 容忍。
+	if a.IPAllow != "" {
+		_, prefixes, err := parseIPAllow(a.IPAllow)
+		if err != nil || !ipAllowContains(prefixes, ip) {
+			writeErr(w, http.StatusUnauthorized, CodeUnauthorized, "该网络不允许登录管理端")
+			return
+		}
+	}
+
 	token, err := auth.NewToken()
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, CodeInternal, "服务内部错误")
