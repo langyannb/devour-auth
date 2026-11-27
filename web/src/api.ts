@@ -125,7 +125,8 @@ export const agentApi = {
 
 export async function tryRestore(): Promise<boolean> {
   try {
-    await request('/admin/api/me')
+    const me = await request<{ csrf_token?: string }>('/admin/api/me')
+    if (me?.csrf_token) setCSRF(me.csrf_token)
     authed.value = true
     return true
   } catch {

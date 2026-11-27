@@ -32,8 +32,9 @@ func (s *Server) agentSummary(w http.ResponseWriter, r *http.Request) {
 	online, _ := s.st.CountSessionsByAgents(ctx, ids, now.Unix())
 	subs, _ := s.st.ListAgents(ctx, c.Agent.ID)
 
-	remaining := int64(-1) // -1 = 不限
-	if c.Agent.MonthlyQuotaCents > 0 {
+	// -1 = 不限；0 及以上为真实剩余
+	remaining := int64(-1)
+	if c.Agent.MonthlyQuotaCents >= 0 {
 		remaining = c.Agent.MonthlyQuotaCents - used
 		if remaining < 0 {
 			remaining = 0

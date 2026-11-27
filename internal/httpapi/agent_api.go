@@ -278,6 +278,10 @@ func (s *Server) agentIssue(w http.ResponseWriter, r *http.Request) {
 			IP: clientIP(r),
 		})
 		if err != nil {
+			if errors.Is(err, agent.ErrQuota) {
+				writeErr(w, http.StatusForbidden, CodeBadInput, err.Error())
+				return
+			}
 			s.writeAPIError(w, err)
 			return
 		}

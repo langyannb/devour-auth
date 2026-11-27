@@ -112,8 +112,8 @@ func (s *Service) IssueByPlan(ctx context.Context, req PlanIssueReq) (IssueResul
 	payable := unitPrice * int64(req.Qty)
 	now := s.now()
 
-	// 月额度
-	if a.MonthlyQuotaCents > 0 {
+	// 月额度：0 = 不能出卡，-1 = 不限
+	if a.MonthlyQuotaCents >= 0 {
 		used, err := s.st.MonthlyIssuedCents(ctx, a.ID, monthStart(now))
 		if err != nil {
 			return IssueResult{}, err

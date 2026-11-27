@@ -45,7 +45,12 @@ const columns: DataTableColumns<Agent> = [
     title: '月额度',
     key: 'monthly_quota_cents',
     width: 120,
-    render: (r) => (r.monthly_quota_cents > 0 ? `${formatYuan(r.monthly_quota_cents)} 元` : '不限'),
+    render: (r) =>
+      r.monthly_quota_cents < 0
+        ? '不限'
+        : r.monthly_quota_cents === 0
+          ? '0（不能出卡）'
+          : `${formatYuan(r.monthly_quota_cents)} 元`,
   },
   { title: '状态', key: 'status', width: 80, render: (r) => statusTag(r.status) },
   { title: '创建', key: 'created_at', width: 150, render: (r) => formatTs(r.created_at) },
@@ -156,8 +161,9 @@ onMounted(load)
         <n-form-item label="密码（至少 12 位）">
           <n-input v-model:value="createForm.password" type="password" show-password-on="click" />
         </n-form-item>
-        <n-form-item label="月额度（元，0 = 不限）">
-          <n-input-number v-model:value="createForm.quotaYuan" :min="0" />
+        <n-form-item label="月额度（元）">
+          <n-input-number v-model:value="createForm.quotaYuan" :min="-1" />
+          <span style="margin-left: 10px; font-size: 12px; color: #8b93a7">0 = 不能出卡，-1 = 不限</span>
         </n-form-item>
         <n-button type="primary" :loading="busy" block @click="create">创建</n-button>
       </n-form>

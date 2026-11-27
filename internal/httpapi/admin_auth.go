@@ -158,7 +158,9 @@ func (s *Server) adminMe(w http.ResponseWriter, r *http.Request) {
 		"role":         c.Admin.Role,
 		"totp_enabled": c.Admin.TotpSecret != "",
 		"reauth_until": c.Session.ReauthUntil,
-		"server_time":  s.now().Unix(),
+		// 刷新/新标签页后 sessionStorage 是空的，这里补一次 CSRF
+		"csrf_token":  c.Session.CSRF,
+		"server_time": s.now().Unix(),
 	})
 }
 

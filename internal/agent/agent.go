@@ -133,8 +133,8 @@ func (s *Service) Issue(ctx context.Context, req IssueReq) (IssueResult, error) 
 	}
 	payable := unitPrice * int64(req.Qty)
 
-	// 额度：本月已出卡金额 + 本次应付 不得超过 monthly_quota_cents（0 = 不限）
-	if a.MonthlyQuotaCents > 0 {
+	// 额度：0 = 没有额度（不能出卡），-1 = 不限，>0 = 上限
+	if a.MonthlyQuotaCents >= 0 {
 		tx, err := s.st.DB().BeginTx(ctx, nil)
 		if err != nil {
 			return IssueResult{}, err

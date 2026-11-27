@@ -105,7 +105,7 @@ onMounted(load)
       <n-descriptions :column="2" size="small" bordered label-placement="left">
         <n-descriptions-item label="层级">L{{ agentInfo.level }}</n-descriptions-item>
         <n-descriptions-item label="月额度">
-          {{ agentInfo.monthly_quota_cents > 0 ? formatYuan(agentInfo.monthly_quota_cents) + ' 元' : '不限' }}
+          {{ agentInfo.monthly_quota_cents < 0 ? '不限' : agentInfo.monthly_quota_cents === 0 ? '0（不能出卡）' : formatYuan(agentInfo.monthly_quota_cents) + ' 元' }}
         </n-descriptions-item>
       </n-descriptions>
     </n-card>
