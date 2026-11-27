@@ -39,12 +39,21 @@ async function settle(b: Bill) {
   } catch (e) { err.value = (e as Error).message }
 }
 
-const kindLabel: Record<string, string> = { issue: '出卡', rebate: '返点', adjust: '调整' }
+const kindLabel: Record<string, string> = { issue: '出卡', rebate: '返点', topup: '加额度', adjust: '调整' }
+const kindTone: Record<string, 'default' | 'success' | 'info' | 'warning' | 'error'> = {
+  issue: 'default', rebate: 'success', topup: 'info', adjust: 'warning',
+}
 
 const ledgerCols: DataTableColumns<Ledger> = [
   { title: '时间', key: 'created_at', width: 150, render: (r) => formatTs(r.created_at) },
   { title: '代理', key: 'agent_id', width: 70 },
-  { title: '类型', key: 'kind', width: 90, render: (r) => kindLabel[r.kind] ?? r.kind },
+  {
+    title: '类型',
+    key: 'kind',
+    width: 90,
+    render: (r) => h(NTag, { size: 'small', type: kindTone[r.kind] ?? 'default' },
+      { default: () => kindLabel[r.kind] ?? r.kind }),
+  },
   { title: '金额（元）', key: 'amount_cents', width: 120, render: (r) => formatYuan(r.amount_cents) },
   { title: '关联', key: 'ref' },
 ]

@@ -323,6 +323,7 @@ func (s *Server) clientQuery(w http.ResponseWriter, r *http.Request) {
 	writeData(w, map[string]any{
 		"status":            c.Status,
 		"kind":              c.Kind,
+		"duration_seconds":  snap.TotalSeconds(),
 		"expire_at":         c.ExpireAt,
 		"points":            c.Points,
 		"remain_times":      c.RemainTimes,
