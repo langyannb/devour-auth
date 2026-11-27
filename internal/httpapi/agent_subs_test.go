@@ -233,11 +233,14 @@ func TestAgentSetsCustomSubPrices(t *testing.T) {
 	var subID int64
 	_ = e.st.DB().QueryRow(`SELECT id FROM agents WHERE name='cp-sub'`).Scan(&subID)
 
-	// 低于成本：拒绝
+	// 低于成本：拒绝，且金额用元显示（不把「分」暴露给代理端）
 	code, body := e.do(t, ac, http.MethodPut, fmt.Sprintf("/agent/api/subagents/%d/plan", subID), acsrf, "",
 		`{"items":{"day":200}}`)
 	if code != http.StatusBadRequest || !strings.Contains(body, "不能低于你的成本") {
 		t.Fatalf("低价应拒绝: %d %s", code, body)
+	}
+	if !strings.Contains(body, "2.00 元") || !strings.Contains(body, "3.00 元") || strings.Contains(body, "分") {
+		t.Fatalf("报错金额应显示为元: %s", body)
 	}
 	// 高于成本：成功并落到 sub_<id> 模板
 	code, body = e.do(t, ac, http.MethodPut, fmt.Sprintf("/agent/api/subagents/%d/plan", subID), acsrf, "",

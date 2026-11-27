@@ -11,6 +11,7 @@ import (
 	"github.com/langyannb/devour-auth/internal/apierr"
 	"github.com/langyannb/devour-auth/internal/auth"
 	"github.com/langyannb/devour-auth/internal/card"
+	"github.com/langyannb/devour-auth/internal/money"
 	"github.com/langyannb/devour-auth/internal/store"
 )
 
@@ -135,7 +136,7 @@ func (s *Service) Issue(ctx context.Context, req IssueReq) (IssueResult, error) 
 
 	// 额度：-1 = 不限，其余为可用余额，用完不能出卡
 	if a.QuotaCents >= 0 && a.QuotaCents < payable {
-		return IssueResult{}, fmt.Errorf("%w: 剩余额度 %d 分，本次需要 %d 分", ErrQuota, a.QuotaCents, payable)
+		return IssueResult{}, fmt.Errorf("%w: 剩余额度 %s 元，本次需要 %s 元", ErrQuota, money.Yuan(a.QuotaCents), money.Yuan(payable))
 	}
 
 	var parent store.Agent

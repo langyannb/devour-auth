@@ -3,6 +3,8 @@ package store
 import (
 	"context"
 	"fmt"
+
+	"github.com/langyannb/devour-auth/internal/money"
 )
 
 // TransferAgentQuota 上级把额度划给下级：扣上级、加下级，各记一条流水。
@@ -23,7 +25,7 @@ func (s *Store) TransferAgentQuota(ctx context.Context, fromID, toID, delta int6
 	}
 	if fromQuota >= 0 {
 		if fromQuota < delta {
-			return fmt.Errorf("余额不足：还剩 %d 分", fromQuota)
+			return fmt.Errorf("余额不足：还剩 %s 元", money.Yuan(fromQuota))
 		}
 		if _, err := tx.ExecContext(ctx,
 			`UPDATE agents SET quota_cents = quota_cents - ? WHERE id = ?`, delta, fromID); err != nil {

@@ -9,6 +9,7 @@ import (
 
 	"github.com/langyannb/devour-auth/internal/audit"
 	"github.com/langyannb/devour-auth/internal/auth"
+	"github.com/langyannb/devour-auth/internal/money"
 	"github.com/langyannb/devour-auth/internal/store"
 )
 
@@ -164,7 +165,7 @@ func (s *Server) agentSubPlan(w http.ResponseWriter, r *http.Request) {
 		}
 		if childPrice < base {
 			writeErr(w, http.StatusBadRequest, CodeBadInput,
-				fmt.Sprintf("「%s」下级的价（%d 分）不能低于你的成本（%d 分）", planKindName(kind), childPrice, base))
+				fmt.Sprintf("「%s」下级的价（%s 元）不能低于你的成本（%s 元）", planKindName(kind), money.Yuan(childPrice), money.Yuan(base)))
 			return
 		}
 	}
