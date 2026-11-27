@@ -1,0 +1,35 @@
+# 二进制
+/bin/
+/build/
+*.exe
+
+# 数据
+/data/
+*.db
+*.db-wal
+*.db-shm
+
+# 环境与密钥
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+secrets/
+deploy/secrets/
+
+# 前端
+web/node_modules/
+web/dist/
+node_modules/
+dist/
+.vite/
+
+# 编辑器
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# 日志
+*.log
