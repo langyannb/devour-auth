@@ -6,7 +6,7 @@ import {
   type DataTableColumns,
 } from 'naive-ui'
 import { api } from '../api'
-import { copyText, formatExpiry, formatTs, kindLabels, statusLabels } from '../utils'
+import { cardKindLabel, copyText, formatExpiry, formatTs, statusLabels } from '../utils'
 
 interface Card {
   id: number
@@ -18,6 +18,9 @@ interface Card {
   remaining_seconds: number
   device_limit: number
   expire_at: number
+  duration_seconds: number
+  bound_devices: number
+  online_devices: number
   created_at: number
   agent_id: number | null
 }
@@ -63,7 +66,7 @@ const columns = computed<DataTableColumns<Card>>(() => [
         onClick: () => router.push(`/cards/${r.id}`),
       }, r.kami),
   },
-  { title: '类型', key: 'kind', width: 86, render: (r) => kindLabels[r.kind] ?? r.kind },
+  { title: '类型', key: 'kind', width: 120, render: (r) => cardKindLabel(r.kind, r.duration_seconds) },
   {
     title: '状态',
     key: 'status',
@@ -81,7 +84,19 @@ const columns = computed<DataTableColumns<Card>>(() => [
       return '—'
     },
   },
-  { title: '设备上限', key: 'device_limit', width: 86 },
+  {
+    title: '设备',
+    key: 'devices',
+    width: 90,
+    render: (r) => `${r.bound_devices}/${r.device_limit}`,
+  },
+  {
+    title: '在线',
+    key: 'online',
+    width: 90,
+    render: (r) => h(NTag, { type: r.online_devices > 0 ? 'success' : 'default', size: 'small' },
+      { default: () => (r.online_devices > 0 ? `在线 ${r.online_devices}` : '离线') }),
+  },
   { title: '到期', key: 'expire_at', width: 140, render: (r) => formatExpiry(r.kind, r.expire_at, r.remaining_seconds) },
   { title: '来源', key: 'agent_id', width: 80, render: (r) => (r.agent_id ? `代理${r.agent_id}` : '平台') },
   {
@@ -204,7 +219,7 @@ onMounted(load)
       :loading="loading"
       :bordered="false"
       size="small"
-      :scroll-x="1050"
+      :scroll-x="1250"
       :row-key="(r: Card) => r.id"
     />
 

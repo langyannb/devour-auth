@@ -333,9 +333,10 @@ func (s *Server) agentCards(w http.ResponseWriter, r *http.Request) {
 		internalErr(w, s.log, "查卡失败", err)
 		return
 	}
-	out := make([]map[string]any, 0, len(cards))
-	for _, cd := range cards {
-		out = append(out, cardJSON(cd))
+	out, err := s.cardListJSON(ctx, cards)
+	if err != nil {
+		internalErr(w, s.log, "查卡失败", err)
+		return
 	}
 	writeData(w, map[string]any{"items": out, "total": total})
 }

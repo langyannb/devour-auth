@@ -2,7 +2,7 @@
 import { computed, h, onMounted, ref } from 'vue'
 import { NAlert, NButton, NDataTable, NInput, NPagination, NSpace, NTag, type DataTableColumns } from 'naive-ui'
 import { agentApi } from '../../api'
-import { copyText, formatExpiry, formatTs, kindLabels, statusLabels } from '../../utils'
+import { cardKindLabel, copyText, formatExpiry, formatTs, statusLabels } from '../../utils'
 
 interface Card {
   id: number
@@ -14,6 +14,10 @@ interface Card {
   remain_times: number
   remaining_seconds: number
   expire_at: number
+  duration_seconds: number
+  device_limit: number
+  bound_devices: number
+  online_devices: number
   created_at: number
 }
 
@@ -44,7 +48,7 @@ const statusType = (s: string) => {
 const columns = computed<DataTableColumns<Card>>(() => [
   { title: 'ID', key: 'id', width: 70 },
   { title: '卡密', key: 'kami', width: 210 },
-  { title: '类型', key: 'kind', width: 90, render: (r) => kindLabels[r.kind] ?? r.kind },
+  { title: '类型', key: 'kind', width: 120, render: (r) => cardKindLabel(r.kind, r.duration_seconds) },
   {
     title: '状态',
     key: 'status',
@@ -62,6 +66,19 @@ const columns = computed<DataTableColumns<Card>>(() => [
     },
   },
   { title: '到期', key: 'expire_at', width: 150, render: (r) => formatExpiry(r.kind, r.expire_at, r.remaining_seconds) },
+  {
+    title: '设备',
+    key: 'devices',
+    width: 90,
+    render: (r) => `${r.bound_devices}/${r.device_limit}`,
+  },
+  {
+    title: '在线',
+    key: 'online',
+    width: 90,
+    render: (r) => h(NTag, { type: r.online_devices > 0 ? 'success' : 'default', size: 'small' },
+      { default: () => (r.online_devices > 0 ? `在线 ${r.online_devices}` : '离线') }),
+  },
   { title: '创建', key: 'created_at', width: 150, render: (r) => formatTs(r.created_at) },
   {
     title: '操作',
@@ -132,7 +149,7 @@ onMounted(load)
     </n-space>
     <n-alert v-if="err" type="error" style="margin-bottom: 12px">{{ err }}</n-alert>
     <n-alert v-if="notice" type="success" style="margin-bottom: 12px">{{ notice }}</n-alert>
-    <n-data-table :columns="columns" :data="rows" :loading="loading" :bordered="false" size="small" :scroll-x="1040" />
+    <n-data-table :columns="columns" :data="rows" :loading="loading" :bordered="false" size="small" :scroll-x="1250" />
     <n-space justify="end" style="margin-top: 16px">
       <n-pagination v-model:page="page" :page-size="pageSize" :item-count="total" @update:page="load" />
     </n-space>
