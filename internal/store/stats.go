@@ -12,10 +12,10 @@ type Stats struct {
 	OnlineSessions int64
 }
 
-func (s *Store) Stats(ctx context.Context, dayStart, now int64) (Stats, error) {
+func (s *Store) Stats(ctx context.Context, appID, dayStart, now int64) (Stats, error) {
 	out := Stats{CardsByStatus: map[string]int64{}}
 
-	rows, err := s.db.QueryContext(ctx, `SELECT status, COUNT(*) FROM cards GROUP BY status`)
+	rows, err := s.db.QueryContext(ctx, `SELECT status, COUNT(*) FROM cards WHERE (? = 0 OR app_id = ?) GROUP BY status`, appID, appID)
 	if err != nil {
 		return out, err
 	}
@@ -39,10 +39,14 @@ func (s *Store) Stats(ctx context.Context, dayStart, now int64) (Stats, error) {
 		arg []any
 		dst *int64
 	}{
-		{`SELECT COUNT(*) FROM devices WHERE unbound_at IS NULL`, nil, &out.DevicesBound},
+		{`SELECT COUNT(*) FROM devices d JOIN cards c ON c.id = d.card_id
+		   WHERE d.unbound_at IS NULL AND (? = 0 OR c.app_id = ?)`, []any{appID, appID}, &out.DevicesBound},
 		{`SELECT COUNT(*) FROM agents WHERE status = 'active'`, nil, &out.AgentsActive},
-		{`SELECT COUNT(*) FROM cards WHERE activated_at >= ?`, []any{dayStart}, &out.ActivationsDay},
-		{`SELECT COUNT(*) FROM sessions WHERE revoked_at IS NULL AND refresh_exp > ?`, []any{now}, &out.OnlineSessions},
+		{`SELECT COUNT(*) FROM cards WHERE activated_at >= ? AND (? = 0 OR app_id = ?)`,
+			[]any{dayStart, appID, appID}, &out.ActivationsDay},
+		{`SELECT COUNT(*) FROM sessions se JOIN cards c ON c.id = se.card_id
+		   WHERE se.revoked_at IS NULL AND se.refresh_exp > ? AND (? = 0 OR c.app_id = ?)`,
+			[]any{now, appID, appID}, &out.OnlineSessions},
 	}
 	for _, x := range scalars {
 		if err := s.db.QueryRowContext(ctx, x.q, x.arg...).Scan(x.dst); err != nil {

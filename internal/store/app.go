@@ -63,6 +63,13 @@ func (s *Store) ListApps(ctx context.Context) ([]App, error) {
 	return out, rows.Err()
 }
 
+// UpdateApp 改名称或启停。
+func (s *Store) UpdateApp(ctx context.Context, id int64, name string, active int64) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE apps SET name = ?, active = ? WHERE id = ?`, name, active, id)
+	return err
+}
+
 // EnsureApp 幂等创建，供首个应用（devour）在启动或初始化时落库。
 func (s *Store) EnsureApp(ctx context.Context, code, name string, now int64) (int64, error) {
 	a, err := s.AppByCode(ctx, code)

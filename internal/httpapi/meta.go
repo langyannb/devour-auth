@@ -13,17 +13,19 @@ import (
 	"github.com/langyannb/devour-auth/internal/store"
 )
 
-// appFromQuery 单应用阶段默认取第一个 app，支持 ?app=code 指定。
+// appFromQuery 解析当前应用：优先 ?app_id=，其次 ?app=code，都没有则取第一个。
 func (s *Server) appFromQuery(r *http.Request) (store.App, error) {
-	code := r.URL.Query().Get("app")
-	if code == "" {
-		apps, err := s.st.ListApps(r.Context())
-		if err != nil || len(apps) == 0 {
-			return store.App{}, store.ErrNotFound
-		}
-		return apps[0], nil
+	if id := queryInt64(r, "app_id"); id > 0 {
+		return s.st.AppByID(r.Context(), id)
 	}
-	return s.st.AppByCode(r.Context(), code)
+	if code := r.URL.Query().Get("app"); code != "" {
+		return s.st.AppByCode(r.Context(), code)
+	}
+	apps, err := s.st.ListApps(r.Context())
+	if err != nil || len(apps) == 0 {
+		return store.App{}, store.ErrNotFound
+	}
+	return apps[0], nil
 }
 
 // rolloutHit 安装量灰度：把设备指纹哈希到 0..9999，小于 rollout_bp 才下发。

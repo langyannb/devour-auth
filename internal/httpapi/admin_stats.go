@@ -12,7 +12,8 @@ import (
 func (s *Server) adminStats(w http.ResponseWriter, r *http.Request) {
 	now := s.now()
 	dayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location()).Unix()
-	st, err := s.st.Stats(r.Context(), dayStart, now.Unix())
+	appID := queryInt64(r, "app_id")
+	st, err := s.st.Stats(r.Context(), appID, dayStart, now.Unix())
 	if err != nil {
 		internalErr(w, s.log, "统计失败", err)
 		return

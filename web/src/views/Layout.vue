@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import {
-  NButton, NDrawer, NDrawerContent, NLayout, NLayoutContent, NLayoutHeader, NLayoutSider, NMenu,
-  type MenuOption,
+  NButton, NDrawer, NDrawerContent, NLayout, NLayoutContent, NLayoutHeader, NLayoutSider,
+  NMenu, NSelect, type MenuOption,
 } from 'naive-ui'
-import { api, authed } from '../api'
+import { api, authed, getCurrentApp, setCurrentApp } from '../api'
 import { useMobile } from '../useMobile'
 import ReauthDialog from './ReauthDialog.vue'
 
@@ -21,10 +21,12 @@ const menu = computed<MenuOption[]>(() => [
   { label: '设备', key: '/devices' },
   { label: '在线', key: '/sessions' },
   { label: '卡类型', key: '/policies' },
+  { label: '权限', key: '/entitlements' },
   { label: '代理', key: '/agents' },
   { label: '运营', key: '/ops' },
   { label: '审计', key: '/audit' },
   { label: '安全', key: '/security' },
+  { label: '应用', key: '/apps' },
   { label: '设置', key: '/settings' },
 ])
 
@@ -45,6 +47,32 @@ async function logout() {
 }
 
 const active = computed(() => router.currentRoute.value.path)
+
+interface AppItem { id: number; code: string; name: string; active: number }
+const apps = ref<AppItem[]>([])
+const appId = ref<string>(getCurrentApp())
+
+async function loadApps() {
+  try {
+    const list = await api.get<AppItem[]>('/admin/api/apps')
+    apps.value = list
+    if (!appId.value || !list.some(a => String(a.id) === appId.value)) {
+      if (list.length) {
+        appId.value = String(list[0].id)
+        setCurrentApp(appId.value)
+      }
+    }
+  } catch {
+    // 未登录时忽略
+  }
+}
+
+function switchApp(v: string) {
+  setCurrentApp(v)
+  location.reload()
+}
+
+onMounted(loadApps)
 </script>
 
 <template>
@@ -61,9 +89,18 @@ const active = computed(() => router.currentRoute.value.path)
       <n-menu :options="menu" :value="active" @update:value="onMenu" />
     </n-layout-sider>
     <n-layout>
-      <n-layout-header bordered style="height: 52px; display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 0 20px">
+      <n-layout-header bordered style="height: 52px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 20px">
+        <n-select
+          v-model:value="appId"
+          :options="apps.map(a => ({ label: `${a.name}（${a.code}）`, value: String(a.id) }))"
+          size="small"
+          style="width: 200px"
+          @update:value="switchApp"
+        />
+        <span style="display:flex;align-items:center;gap:12px">
         <span style="color: #666">{{ user }}</span>
         <n-button size="small" @click="logout">退出</n-button>
+        </span>
       </n-layout-header>
       <n-layout-content content-style="padding: 20px">
         <router-view />
@@ -77,6 +114,13 @@ const active = computed(() => router.currentRoute.value.path)
       <n-button text style="font-size: 20px; line-height: 1" @click="drawer = true">☰</n-button>
       <span style="font-weight: 600">Devour Auth</span>
       <span style="flex: 1"></span>
+      <n-select
+        v-model:value="appId"
+        :options="apps.map(a => ({ label: a.name, value: String(a.id) }))"
+        size="tiny"
+        style="width: 110px"
+        @update:value="switchApp"
+      />
       <n-button text size="small" @click="logout">退出</n-button>
     </header>
     <main style="flex: 1; padding: 12px; overflow-x: auto">

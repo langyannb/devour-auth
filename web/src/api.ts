@@ -1,6 +1,18 @@
 import { ref } from 'vue'
 
 export const authed = ref(false)
+
+// 当前管理端上下文的应用（多应用切换）
+let currentApp = sessionStorage.getItem('devour_app') ?? ''
+
+export function getCurrentApp(): string {
+  return currentApp
+}
+
+export function setCurrentApp(id: string) {
+  currentApp = id
+  sessionStorage.setItem('devour_app', id)
+}
 export const agentAuthed = ref(false)
 
 // 敏感操作需要 5 分钟内重新验证；请求层遇到 403 就挂起等用户验证完再重试一次。
@@ -40,6 +52,14 @@ export function setCSRF(v: string, scope: Scope = 'admin'): void {
 type Body = { ok: boolean; code?: string; message?: string; data?: unknown }
 
 async function request<T>(path: string, init: RequestInit = {}, scope: Scope = 'admin', retried = false): Promise<T> {
+  // 管理端请求统一带上当前应用
+  if (scope === 'admin' && currentApp && path.startsWith('/admin/api/')) {
+    const u = new URL(path, location.origin)
+    if (!u.searchParams.has('app_id') && !u.searchParams.has('app')) {
+      u.searchParams.set('app_id', currentApp)
+      path = u.pathname + '?' + u.searchParams.toString()
+    }
+  }
   const method = (init.method ?? 'GET').toUpperCase()
   const headers: Record<string, string> = {}
   if (init.body) headers['Content-Type'] = 'application/json'
