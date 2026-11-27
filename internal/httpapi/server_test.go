@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/langyannb/devour-auth/internal/auth"
 	"github.com/langyannb/devour-auth/internal/httpapi"
@@ -48,7 +49,8 @@ func setup(t *testing.T) env {
 		t.Fatal(err)
 	}
 
-	srv := httpapi.New(st, slog.New(slog.NewTextHandler(io.Discard, nil)), "dev")
+	srv := httpapi.New(st, slog.New(slog.NewTextHandler(io.Discard, nil)), "dev",
+		fstest.MapFS{"index.html": &fstest.MapFile{Data: []byte("<!doctype html><title>test</title>")}})
 	ts := httptest.NewServer(srv.Handler())
 	t.Cleanup(ts.Close)
 	return env{ts: ts, st: st}

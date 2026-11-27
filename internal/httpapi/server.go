@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"io/fs"
 	"log/slog"
 	"net/http"
 	"time"
@@ -15,17 +16,19 @@ type Server struct {
 	st      *store.Store
 	cards   *card.Service
 	clients *clientauth.Service
+	static  fs.FS
 	log     *slog.Logger
 	env     string
 	lim     *auth.Limiter
 	now     func() time.Time
 }
 
-func New(st *store.Store, log *slog.Logger, env string) *Server {
+func New(st *store.Store, log *slog.Logger, env string, static fs.FS) *Server {
 	return &Server{
 		st:      st,
 		cards:   card.New(st),
 		clients: clientauth.New(st),
+		static:  static,
 		log:     log,
 		env:     env,
 		lim:     auth.NewLimiter(),
@@ -78,7 +81,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /v1/consume", s.clientConsume)
 	mux.HandleFunc("POST /v1/pause", s.clientPause)
 
-	// 未匹配路径也走统一错误体（JSON 端点，不返回 HTML）。
+	// 未匹配路径：API 前缀返回 JSON 错误，其余交给前端路由。
+	mux.HandleFunc("GET /", s.spa)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusNotFound, CodeBadInput, "接口不存在")
 	})

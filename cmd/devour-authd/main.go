@@ -16,6 +16,7 @@ import (
 	"github.com/langyannb/devour-auth/internal/config"
 	"github.com/langyannb/devour-auth/internal/httpapi"
 	"github.com/langyannb/devour-auth/internal/store"
+	"github.com/langyannb/devour-auth/internal/webui"
 )
 
 func main() {
@@ -81,7 +82,7 @@ func run() error {
 
 	srv := &http.Server{
 		Addr:              cfg.ListenAddr,
-		Handler:           httpapi.New(st, log, cfg.Env).Handler(),
+		Handler:           httpapi.New(st, log, cfg.Env, webui.FS()).Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
 		IdleTimeout:       60 * time.Second,
 	}
