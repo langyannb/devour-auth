@@ -202,24 +202,29 @@ ssh root@43.248.187.94 '
 
 ### 5.1 自动备份
 
-`deploy/backup.sh`，cron 每小时：
+`deploy/backup.sh` 安装在 `/opt/devour-auth/backup.sh`，由 `devour-backup.timer` 每小时执行：
+
+- 走 SQLite 在线备份 API 导出（不直接拷 WAL 中间态）
+- GPG 加密，收件人 `devour-backup`；公钥在服务器 `/etc/devour-authd/backup-public.asc`
+- 保留 14 天（`find -mtime +14`）
+
+**私钥不在应用服务器上。** 私钥 `devour-backup-private.asc` 只在运维本地（当前
+`/root/devour-backup-private.asc`，0600），务必另存到离线介质：丢了就解不开任何备份。
+
+首次部署生成密钥（在一台有 gpg 的机器上）：
 
 ```bash
-sqlite3 /var/lib/devour/app.db ".backup '/var/backups/devour/app-$(date +%Y%m%d%H).db'"
-gpg --batch --yes --encrypt --recipient devour-backup \
-    --output "/var/backups/devour/app-$(date +%Y%m%d%H).db.gpg" \
-    "/var/backups/devour/app-$(date +%Y%m%d%H).db"
-rm -f "/var/backups/devour/app-$(date +%Y%m%d%H).db"
-find /var/backups/devour -name '*.gpg' -mtime +14 -delete
+export GNUPGHOME=/root/.gnupg-backup
+gpg --batch --passphrase '' --quick-gen-key 'devour-backup <backup@devour.local>' rsa2048 encr 0
+gpg --armor --export-secret-keys devour-backup > devour-backup-private.asc   # 带走，不要留在服务器
+gpg --armor --export devour-backup > /etc/devour-authd/backup-public.asc
 ```
-
-GPG 私钥不放在应用服务器上，否则备份加密失去意义。
 
 ### 5.2 恢复
 
 ```bash
 systemctl stop devour-authd
-gpg --decrypt /var/backups/devour/app-2026112715.db.gpg > /var/lib/devour/app.db
+gpg --batch -d /var/backups/devour/app-2026112716.db.gpg > /var/lib/devour/app.db
 chown devour:devour /var/lib/devour/app.db
 chmod 600 /var/lib/devour/app.db
 systemctl start devour-authd

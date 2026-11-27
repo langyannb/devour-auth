@@ -1,0 +1,7 @@
+[Unit]
+Description=Devour Auth SQLite 备份
+After=devour-authd.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/devour-auth/backup.sh

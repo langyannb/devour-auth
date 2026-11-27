@@ -1,0 +1,9 @@
+[Unit]
+Description=每小时备份 Devour Auth 数据库
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+
+[Install]
+WantedBy=timers.target
