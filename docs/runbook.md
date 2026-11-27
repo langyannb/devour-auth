@@ -258,7 +258,20 @@ systemctl start devour-authd
 
 ### 5.3 异地
 
-建议每日把最新备份同步到另一台机器或对象存储。未实现前，至少每周手工下载一次。
+服务器每小时生成加密备份，开发机每 30 分钟用 `scp` 拉一份到 `/root/devour-backups/`：
+
+- 脚本：`/root/backup-pull.sh`（源 `root@43.248.187.94:/var/backups/devour/`）
+- 日志：`/var/log/devour-backup-pull.log`
+
+开发机没有 systemd/cron，脚本是常驻循环，**重启后需要手动拉起**：
+
+```bash
+setsid nohup /root/backup-pull.sh >/dev/null 2>&1 < /dev/null &
+```
+
+这只保证「服务器整机挂了还有一份」。要抵御开发机一起丢，把
+`/root/devour-backups/` 与私钥 `/root/devour-backup-private.asc` 再同步到离线介质或对象存储
+（两者一起丢等于备份不可用）。
 
 ## 6. 审计链
 
