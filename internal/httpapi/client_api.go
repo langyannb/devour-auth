@@ -287,6 +287,52 @@ func (s *Server) revokeCardEntitlement(w http.ResponseWriter, r *http.Request) {
 	writeData(w, map[string]any{"card_id": id, "code": req.Code, "revoked": true})
 }
 
+// ---------- 查卡（终端用户自助查询） ----------
+
+// clientQuery 凭卡密查状态与绑定数，不返回卡密本身，也不需要登录。
+// 设计要求的图形验证码尚未实现，先用按 IP 限流兜底。
+func (s *Server) clientQuery(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Kami string `json:"kami"`
+	}
+	if !decode(w, r, &req) {
+		return
+	}
+	if strings.TrimSpace(req.Kami) == "" {
+		writeErr(w, http.StatusBadRequest, CodeBadInput, "请输入卡密")
+		return
+	}
+	ip := clientIP(r)
+	if !s.lim.Allow("query:ip:"+ip, 10, time.Minute) {
+		writeErr(w, http.StatusTooManyRequests, CodeRateLimited, "查询过于频繁")
+		return
+	}
+
+	c, err := s.st.CardByKami(r.Context(), strings.TrimSpace(req.Kami))
+	if err != nil {
+		writeErr(w, http.StatusNotFound, CodeCardNotFound, "卡密不存在")
+		return
+	}
+	bound, err := s.st.CountBoundDevices(r.Context(), c.ID)
+	if err != nil {
+		internalErr(w, s.log, "查设备失败", err)
+		return
+	}
+	snap := clientauth.SnapshotOf(c)
+	writeData(w, map[string]any{
+		"status":            c.Status,
+		"kind":              c.Kind,
+		"expire_at":         c.ExpireAt,
+		"points":            c.Points,
+		"remain_times":      c.RemainTimes,
+		"remaining_seconds": c.RemainingSeconds,
+		"paused":            c.Paused == 1,
+		"device_limit":      snap.DeviceLimit,
+		"bound_devices":     bound,
+		"server_time":       s.now().Unix(),
+	})
+}
+
 func (s *Server) clientSession(w http.ResponseWriter, r *http.Request) {
 	tok := bearer(r)
 	if tok == "" {

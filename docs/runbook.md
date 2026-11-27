@@ -62,9 +62,14 @@ DEVOUR_LISTEN=127.0.0.1:6760
 DEVOUR_DB=/var/lib/devour/app.db
 DEVOUR_ENV=prod
 DEVOUR_AUDIT_KEY=/etc/devour-authd/audit_ed25519.key
+DEVOUR_ADMIN_HOST=admin.namikao.com
+DEVOUR_AGENT_HOST=agent.namikao.com
+DEVOUR_NET_HOST=net.namikao.com,namikao.com,www.namikao.com
 ```
 
 - `DEVOUR_ENV=prod` 时管理端 cookie 用 `__Host-` 前缀并带 `Secure`，必须走 HTTPS。
+- 三个子域共用一张证书，服务端 `hostGuard` 按 Host 限制可达路径：
+  `admin.*` 只能打 `/admin/*`，`agent.*` 只能打 `/agent/*`，客户端域只能打 `/v1/*` 与静态页。
 - 审计私钥首次启动自动生成（0600，64 字节 Ed25519），也可靠 `DEVOUR_AUDIT_KEY` 指定路径。
 - 尚未实现：管理 IP 白名单、日志级别开关。
 
@@ -114,21 +119,22 @@ sudo -u devour /opt/devour-auth/devour-authd init-admin
 
 ### 2.6 nginx
 
-`/etc/nginx/sites-available/devour-auth`：
+`/etc/nginx/sites-available/devour-auth`（三端同机，共用一张证书）：
 
 ```nginx
-limit_req_zone $binary_remote_addr zone=auth:10m rate=5r/s;
+limit_req_zone $binary_remote_addr zone=devourauth:10m rate=5r/s;
 
 server {
     listen 80;
-    server_name net.namikao.com;
+    server_name net.namikao.com admin.namikao.com agent.namikao.com;
+
     location /.well-known/acme-challenge/ { root /var/www/certbot; }
     location / { return 301 https://$host$request_uri; }
 }
 
 server {
     listen 443 ssl http2;
-    server_name net.namikao.com;
+    server_name net.namikao.com admin.namikao.com agent.namikao.com;
 
     ssl_certificate     /etc/letsencrypt/live/net.namikao.com/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/net.namikao.com/privkey.pem;
@@ -142,7 +148,7 @@ server {
     client_max_body_size 2m;
 
     location / {
-        limit_req zone=auth burst=20 nodelay;
+        limit_req zone=devourauth burst=20 nodelay;
         proxy_pass http://127.0.0.1:6760;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -151,6 +157,14 @@ server {
         proxy_read_timeout 30s;
     }
 }
+```
+
+证书覆盖三个域名：
+
+```bash
+certbot certonly --webroot -w /var/www/certbot \
+  -d net.namikao.com -d admin.namikao.com -d agent.namikao.com \
+  --expand --non-interactive --agree-tos
 ```
 
 ```bash

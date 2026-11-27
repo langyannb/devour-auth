@@ -87,8 +87,15 @@ func run() error {
 	startAnchoring(ctx, st.DB(), priv, log)
 
 	srv := &http.Server{
-		Addr:              cfg.ListenAddr,
-		Handler:           httpapi.New(st, log, cfg.Env, webui.FS(), priv).Handler(),
+		Addr: cfg.ListenAddr,
+		Handler: httpapi.New(st, log, httpapi.Options{
+			Env:       cfg.Env,
+			Static:    webui.FS(),
+			TicketKey: priv,
+			AdminHost: cfg.AdminHost,
+			AgentHost: cfg.AgentHost,
+			NetHost:   cfg.NetHost,
+		}).Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
 		IdleTimeout:       60 * time.Second,
 	}

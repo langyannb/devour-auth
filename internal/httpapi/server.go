@@ -14,6 +14,16 @@ import (
 	"github.com/langyannb/devour-auth/internal/store"
 )
 
+// Options 服务端启动参数，集中传避免构造函数参数爆炸。
+type Options struct {
+	Env       string
+	Static    fs.FS
+	TicketKey ed25519.PrivateKey
+	AdminHost string
+	AgentHost string
+	NetHost   string
+}
+
 type Server struct {
 	st         *store.Store
 	cards      *card.Service
@@ -23,21 +33,27 @@ type Server struct {
 	ticketKey  ed25519.PrivateKey
 	log        *slog.Logger
 	env        string
+	adminHost  string
+	agentHost  string
+	netHost    string
 	lim        *auth.Limiter
 	openNonces *auth.Limiter
 	now        func() time.Time
 }
 
-func New(st *store.Store, log *slog.Logger, env string, static fs.FS, ticketKey ed25519.PrivateKey) *Server {
+func New(st *store.Store, log *slog.Logger, opt Options) *Server {
 	return &Server{
 		st:         st,
 		cards:      card.New(st),
 		clients:    clientauth.New(st),
 		agents:     agent.New(st),
-		static:     static,
-		ticketKey:  ticketKey,
+		static:     opt.Static,
+		ticketKey:  opt.TicketKey,
 		log:        log,
-		env:        env,
+		env:        opt.Env,
+		adminHost:  opt.AdminHost,
+		agentHost:  opt.AgentHost,
+		netHost:    opt.NetHost,
 		lim:        auth.NewLimiter(),
 		openNonces: auth.NewLimiter(),
 		now:        time.Now,
@@ -136,12 +152,14 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /v1/consume", s.clientConsume)
 	mux.HandleFunc("POST /v1/pause", s.clientPause)
 
+	mux.HandleFunc("POST /v1/query", s.clientQuery)
+
 	// 未匹配路径：API 前缀返回 JSON 错误，其余交给前端路由。
 	mux.HandleFunc("GET /", s.spa)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusNotFound, CodeBadInput, "接口不存在")
 	})
-	return s.withLogging(mux)
+	return s.withLogging(s.hostGuard(mux))
 }
 
 func (s *Server) healthz(w http.ResponseWriter, r *http.Request) {

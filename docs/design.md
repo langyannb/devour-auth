@@ -82,6 +82,8 @@ Devour Auth 是一套自建的软件授权与卡密验证系统：服务端、�
 规则：
 
 - `admins` 与 `agents` 是两张独立的表、两套登录、两套会话域。
+- 三端各用独立子域：`admin.namikao.com` / `agent.namikao.com` / `net.namikao.com`，
+  cookie 按域天然隔离；服务端 `hostGuard` 再按子域限制可达路径。
 - `/admin/*` 只认 admin 会话，`/agent/*` 只认 agent 会话，交叉访问一律 `403`。
 - 授权检查写在每个 handler，不依赖前端隐藏菜单。
 - 代理查询强制 `agent_id IN (自己, 下级)`，在 SQL 层拼条件。
@@ -664,7 +666,7 @@ Vue 3 + TypeScript + Vite + Naive UI + Pinia + ECharts，构建产物 embed 进 
 ### 16.5 网络
 
 - TLS 1.2+，HSTS，`X-Frame-Options: DENY`，CSP。
-- 管理端与代理端同域不同路径，cookie 不跨站。
+- 管理端与代理端分属不同子域，cookie 不跨域；同一份二进制按 Host 路由到不同前端。
 - 6760 只监听 `127.0.0.1`。
 
 ### 16.6 边界

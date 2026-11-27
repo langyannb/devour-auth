@@ -11,9 +11,9 @@ const drawer = ref(false)
 const who = sessionStorage.getItem('devour_agent_name') ?? ''
 
 const menu = computed<MenuOption[]>(() => [
-  { label: '我的卡密', key: '/agent/cards' },
-  { label: '出卡', key: '/agent/issue' },
-  { label: '账单与流水', key: '/agent/billing' },
+  { label: '我的卡密', key: '/cards' },
+  { label: '出卡', key: '/issue' },
+  { label: '账单与流水', key: '/billing' },
 ])
 
 function onMenu(key: string) {
@@ -29,7 +29,7 @@ async function logout() {
   }
   agentAuthed.value = false
   sessionStorage.removeItem('devour_agent_name')
-  router.push('/agent/login')
+  router.push('/login')
 }
 
 const active = computed(() => router.currentRoute.value.path)

@@ -58,8 +58,13 @@ func setup(t *testing.T) env {
 	if err != nil {
 		t.Fatal(err)
 	}
-	srv := httpapi.New(st, slog.New(slog.NewTextHandler(io.Discard, nil)), "dev",
-		fstest.MapFS{"index.html": &fstest.MapFile{Data: []byte("<!doctype html><title>test</title>")}}, priv)
+	srv := httpapi.New(st, slog.New(slog.NewTextHandler(io.Discard, nil)), httpapi.Options{
+		Env:       "dev",
+		Static:    fstest.MapFS{"index.html": &fstest.MapFile{Data: []byte("<!doctype html><title>test</title>")}},
+		TicketKey: priv,
+		AdminHost: "admin.test",
+		AgentHost: "agent.test",
+	})
 	ts := httptest.NewServer(srv.Handler())
 	t.Cleanup(ts.Close)
 	return env{ts: ts, st: st}

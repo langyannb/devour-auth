@@ -28,7 +28,7 @@ async function submit() {
     setCSRF(d.csrf_token, 'agent')
     sessionStorage.setItem('devour_agent_name', `${d.name} · L${d.level}`)
     agentAuthed.value = true
-    router.push('/agent/cards')
+    router.push('/cards')
   } catch (e) {
     err.value = (e as Error).message
   } finally {
