@@ -43,8 +43,14 @@ func main() {
 			month = os.Args[2]
 		}
 		err = runBills(config.Load(), month)
+	case "reset-admin":
+		name := ""
+		if len(os.Args) > 2 {
+			name = os.Args[2]
+		}
+		err = runResetAdmin(config.Load(), name)
 	default:
-		fmt.Fprintf(os.Stderr, "用法: %s [serve|init-admin|verify-audit|anchor|seed|bills [YYYY-MM]]\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "用法: %s [serve|init-admin|verify-audit|anchor|seed|bills [YYYY-MM]|reset-admin <新用户名>]\n", os.Args[0])
 		os.Exit(2)
 	}
 

@@ -117,8 +117,18 @@ sudo -u devour /opt/devour-auth/devour-authd init-admin
 
 不要设置默认密码，不要写进仓库或文档。
 
-### 2.6 nginx
+### 2.5.1 改管理员账号
 
+密码从 stdin 读（不进 shell 历史），会同时吊销该账号全部旧会话并写审计：
+
+```bash
+echo '新密码' | DEVOUR_DB=/var/lib/devour/app.db \
+  /opt/devour-auth/devour-authd reset-admin 新用户名
+```
+
+只允许在只有一个管理员时直接改；有多个会要求先指定。
+
+### 2.6 nginx
 `/etc/nginx/sites-available/devour-auth`（三端同机，共用一张证书）：
 
 ```nginx

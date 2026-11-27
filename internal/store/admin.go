@@ -60,6 +60,23 @@ func (s *Store) AdminByID(ctx context.Context, id int64) (Admin, error) {
 	return a, nil
 }
 
+func (s *Store) ListAdminUsernames(ctx context.Context) ([]string, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT username FROM admins ORDER BY id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var u string
+		if err := rows.Scan(&u); err != nil {
+			return nil, err
+		}
+		out = append(out, u)
+	}
+	return out, rows.Err()
+}
+
 func (s *Store) AdminCount(ctx context.Context) (int, error) {
 	var n int
 	err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM admins`).Scan(&n)
@@ -151,4 +168,24 @@ func (s *Store) SetAdminTOTP(ctx context.Context, adminID int64, secret string) 
 	_, err := s.db.ExecContext(ctx,
 		`UPDATE admins SET totp_secret = NULLIF(?, '') WHERE id = ?`, secret, adminID)
 	return err
+}
+
+// SetAdminCredentials 改用户名与密码哈希。
+func (s *Store) SetAdminCredentials(ctx context.Context, adminID int64, username, passHash string) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE admins SET username = ?, pass_hash = ? WHERE id = ?`, username, passHash, adminID)
+	if err != nil && isUniqueViolation(err) {
+		return ErrConflict
+	}
+	return err
+}
+
+// RevokeAllAdminSessions 改密码后踢掉该账号全部会话。
+func (s *Store) RevokeAllAdminSessions(ctx context.Context, adminID, now int64) (int64, error) {
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE admin_sessions SET revoked_at = ? WHERE admin_id = ? AND revoked_at IS NULL`, now, adminID)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
 }
