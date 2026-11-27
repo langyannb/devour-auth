@@ -481,7 +481,7 @@ BEGIN SELECT RAISE(ABORT, 'audit_log is append-only'); END;
 
 ### 10.2 自助解绑
 
-- 独立域名 `unbind.zhenx.xyz`（`DEVOUR_UNBIND_HOST`），只挂解绑页与 `/v1/query*`。
+- 独立域名 `unbind.namikao.com`（`DEVOUR_UNBIND_HOST`），只挂解绑页与 `/v1/query*`。
 - 流程：卡密 + 验证码 → 查状态与已绑设备（指纹脱敏）→ 勾选设备解绑。
   查卡返回 5 分钟有效的 `unbind_ticket`，解绑时校验，不必再输一次验证码。
 - 策略由管理员在设置页配置（应用开关 `flags`）：
