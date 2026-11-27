@@ -80,7 +80,7 @@ func TestIssuePricingAndLedger(t *testing.T) {
 	ctx := context.Background()
 	e := setup(t)
 	p := e.policy(t, 1000) // 10 元
-	a := e.agent(t, "ag1", 0, 7000, 0, 0)
+	a := e.agent(t, "ag1", 0, 7000, 0, -1)
 
 	res, err := e.svc.Issue(ctx, IssueReq{AgentID: a.ID, PolicyID: p.ID, Qty: 3, Prefix: "AG"})
 	if err != nil {
@@ -122,8 +122,8 @@ func TestRebateToParent(t *testing.T) {
 	ctx := context.Background()
 	e := setup(t)
 	p := e.policy(t, 1000)
-	parent := e.agent(t, "top", 0, 6000, 500, 0) // 返点 5%
-	child := e.agent(t, "sub", parent.ID, 8000, 0, 0)
+	parent := e.agent(t, "top", 0, 6000, 500, -1) // 返点 5%
+	child := e.agent(t, "sub", parent.ID, 8000, 0, -1)
 
 	res, err := e.svc.Issue(ctx, IssueReq{AgentID: child.ID, PolicyID: p.ID, Qty: 2, Prefix: "AG"})
 	if err != nil {
@@ -146,7 +146,7 @@ func TestFrozenAgentCannotIssue(t *testing.T) {
 	ctx := context.Background()
 	e := setup(t)
 	p := e.policy(t, 1000)
-	a := e.agent(t, "ag3", 0, 8000, 0, 0)
+	a := e.agent(t, "ag3", 0, 8000, 0, -1)
 	if err := e.st.SetAgentStatus(ctx, a.ID, "frozen", store.NullInt64(e.now.Unix())); err != nil {
 		t.Fatal(err)
 	}
@@ -158,9 +158,9 @@ func TestFrozenAgentCannotIssue(t *testing.T) {
 func TestVisibleScope(t *testing.T) {
 	ctx := context.Background()
 	e := setup(t)
-	parent := e.agent(t, "top2", 0, 6000, 0, 0)
-	child := e.agent(t, "sub2", parent.ID, 8000, 0, 0)
-	other := e.agent(t, "other", 0, 8000, 0, 0)
+	parent := e.agent(t, "top2", 0, 6000, 0, -1)
+	child := e.agent(t, "sub2", parent.ID, 8000, 0, -1)
+	other := e.agent(t, "other", 0, 8000, 0, -1)
 
 	ids, err := e.svc.VisibleAgentIDs(ctx, parent.ID)
 	if err != nil {
@@ -182,7 +182,7 @@ func TestBillGeneration(t *testing.T) {
 	ctx := context.Background()
 	e := setup(t)
 	p := e.policy(t, 1000)
-	a := e.agent(t, "ag4", 0, 10000, 0, 0)
+	a := e.agent(t, "ag4", 0, 10000, 0, -1)
 
 	e.now = time.Date(2026, 11, 15, 10, 0, 0, 0, time.Local)
 	if _, err := e.svc.Issue(ctx, IssueReq{AgentID: a.ID, PolicyID: p.ID, Qty: 2, Prefix: "AG"}); err != nil {
