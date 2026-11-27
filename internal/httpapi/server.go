@@ -115,6 +115,16 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /admin/api/stats/trend", s.requireAdmin(s.statsTrend))
 	mux.HandleFunc("GET /admin/api/health-check", s.requireAdmin(s.healthCheck))
 
+	// 黑名单 / 事件 / 财务 / 批次 / 系统状态
+	mux.HandleFunc("GET /admin/api/blacklist", s.requireAdmin(s.listBlacklist))
+	mux.HandleFunc("POST /admin/api/blacklist", s.requireAdmin(s.addBlacklist))
+	mux.HandleFunc("DELETE /admin/api/blacklist/{id}", s.requireAdmin(s.removeBlacklist))
+	mux.HandleFunc("GET /admin/api/events", s.requireAdmin(s.listEvents))
+	mux.HandleFunc("GET /admin/api/finance/ledger", s.requireAdmin(s.listFinanceLedger))
+	mux.HandleFunc("GET /admin/api/finance/bills", s.requireAdmin(s.listFinanceBills))
+	mux.HandleFunc("GET /admin/api/batches", s.requireAdmin(s.listBatches))
+	mux.HandleFunc("GET /admin/api/system/status", s.requireAdmin(s.systemStatus))
+
 	// 设备与在线会话
 	mux.HandleFunc("GET /admin/api/devices", s.requireAdmin(s.listDevices))
 	mux.HandleFunc("POST /admin/api/devices/{id}/unbind", s.requireAdmin(s.deviceAction("unbind")))
@@ -144,6 +154,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /agent/api/ledger", s.requireAgent(s.agentLedger))
 	mux.HandleFunc("GET /agent/api/bills", s.requireAgent(s.agentBills))
 	mux.HandleFunc("GET /agent/api/subagents", s.requireAgent(s.agentSubagents))
+	mux.HandleFunc("POST /agent/api/subagents", s.requireAgent(s.agentCreateSub))
+	mux.HandleFunc("POST /agent/api/password", s.requireAgent(s.agentChangePassword))
+	mux.HandleFunc("GET /agent/api/ledger/export", s.requireAgent(s.agentBillsExport))
 
 	// 运营内容
 	mux.HandleFunc("GET /admin/api/releases", s.requireAdmin(s.listReleases))

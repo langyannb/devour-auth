@@ -142,6 +142,18 @@ func (s *Service) Login(ctx context.Context, req LoginReq, ip, ua string) (Sessi
 		return SessionView{}, err
 	}
 
+	// 黑名单：IP 与设备指纹命中直接拒绝
+	if blocked, err := s.st.BlacklistedTx(ctx, tx, row.AppID, "ip", ip, now.Unix()); err != nil {
+		return SessionView{}, err
+	} else if blocked {
+		return SessionView{}, apierr.New(apierr.CardBanned, "该网络已被限制")
+	}
+	if blocked, err := s.st.BlacklistedTx(ctx, tx, row.AppID, "device", req.Fingerprint, now.Unix()); err != nil {
+		return SessionView{}, err
+	} else if blocked {
+		return SessionView{}, apierr.New(apierr.DeviceMismatch, "该设备已被限制")
+	}
+
 	snap := SnapshotOf(row)
 	if snap.DeviceLimit <= 0 {
 		snap.DeviceLimit = row.DeviceLimit

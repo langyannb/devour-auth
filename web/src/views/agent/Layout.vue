@@ -15,6 +15,7 @@ const menu = computed<MenuOption[]>(() => [
   { label: '出卡', key: '/issue' },
   { label: '下级', key: '/subagents' },
   { label: '账单与流水', key: '/billing' },
+  { label: '设置', key: '/settings' },
 ])
 
 function onMenu(key: string) {

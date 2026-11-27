@@ -26,6 +26,9 @@ const adminRoutes: RouteRecordRaw[] = [
       { path: 'entitlements', component: () => import('./views/Entitlements.vue') },
       { path: 'apps', component: () => import('./views/Apps.vue') },
       { path: 'open', component: () => import('./views/OpenApi.vue') },
+      { path: 'blacklist', component: () => import('./views/Blacklist.vue') },
+      { path: 'events', component: () => import('./views/Events.vue') },
+      { path: 'finance', component: () => import('./views/Finance.vue') },
       { path: 'agents', component: () => import('./views/Agents.vue') },
       { path: 'ops', component: () => import('./views/Ops.vue') },
       { path: 'audit', component: () => import('./views/Audit.vue') },
@@ -46,6 +49,7 @@ const agentRoutes: RouteRecordRaw[] = [
       { path: 'issue', component: () => import('./views/agent/Issue.vue') },
       { path: 'subagents', component: () => import('./views/agent/Subagents.vue') },
       { path: 'billing', component: () => import('./views/agent/Billing.vue') },
+      { path: 'settings', component: () => import('./views/agent/Settings.vue') },
     ],
   },
 ]
