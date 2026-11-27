@@ -7,13 +7,13 @@
 
 ## 状态
 
-服务端进行中：骨架、迁移、审计哈希链、管理端登录与卡密 CRUD、客户端登录/设备绑定/会话已实现。
-管理端与代理端页面、消耗接口、审计每日锚定未开始。进度见 `docs/design.md` 第 18 节。
+服务端 I1 完成：卡密/卡类型/权限/设备绑定/会话、消耗与暂停、审计哈希链与每日 Ed25519 锚定。
+未开始：管理端与代理端前端、代理体系（I2）、开放 API（I3）。进度见 `docs/design.md` 第 18 节。
 
 ## 技术栈
 
 - 服务端：Go 1.26，标准库 `net/http`，SQLite（WAL），前端产物 `embed`
-- 管理端 / 代理端：Vue 3 + TypeScript + Vite + Naive UI + ECharts
+- 管理端 / 代理端：Vue 3 + TypeScript + Vite + Naive UI（图表页再引入 ECharts；状态用模块级 ref，暂不引 Pinia）
 - 部署：单二进制 + systemd + nginx（TLS 终止）
 
 ## 快速开始

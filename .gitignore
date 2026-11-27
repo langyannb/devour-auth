@@ -36,3 +36,6 @@ dist/
 
 # 索引产物
 .codebase-memory/
+
+# 前端构建产物
+internal/webui/dist/

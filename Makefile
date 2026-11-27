@@ -1,10 +1,17 @@
 BIN := bin/devour-authd
 
-.PHONY: dev test check fmt build build-linux-amd64 clean
+.PHONY: dev test check fmt build build-linux-amd64 clean web web-build
 
 # 本地起服务（自动迁移）
 dev:
 	go run ./cmd/devour-authd
+
+# 前端开发服务器（代理到 127.0.0.1:6760）
+web:
+	cd web && npm run dev
+
+web-build:
+	cd web && npm run build
 
 test:
 	go test ./...
