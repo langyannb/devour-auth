@@ -34,15 +34,14 @@ const customText = ref('')
 const kamis = ref<string[]>([])
 const batchId = ref(0)
 
-const items = computed(() => plan.value?.plan?.items ?? [])
+const items = computed(() => (plan.value?.plan?.items ?? []).filter((i) => i.kind !== 'custom'))
 const perms = computed(() => plan.value?.permissions ?? { SetDeviceLimit: false, CustomKami: false, MaxQty: 10 })
 const selected = computed(() => items.value.find((i) => i.kind === form.value.kind))
 
 const total = computed(() => {
   const unit = selected.value?.price_cents ?? 0
   // 单码卡密按份数计价，与服务端一致；永久卡不受份数影响，自定义时间按所选数值计
-  let factor = form.value.kind === 'forever' ? 1 : form.value.multiplier
-  if (form.value.kind === 'custom') factor *= Math.max(1, form.value.value)
+  const factor = form.value.kind === 'forever' ? 1 : form.value.multiplier
   return unit * form.value.qty * factor
 })
 
@@ -87,10 +86,6 @@ async function issue() {
       multiplier: form.value.multiplier,
       qty: customKami.value ? customLines.value.length : form.value.qty,
       prefix: form.value.prefix,
-    }
-    if (form.value.kind === 'custom') {
-      payload.value = form.value.value
-      payload.unit = form.value.unit
     }
     if (perms.value.SetDeviceLimit) payload.device_limit = form.value.deviceLimit
     if (customKami.value) payload.kamis = customLines.value
@@ -143,15 +138,6 @@ onMounted(load)
           />
         </n-form-item>
 
-        <n-form-item v-if="form.kind === 'custom'" label="自定义时长">
-          <n-input-number v-model:value="form.value" :min="1" :max="100000" style="width: 140px" />
-          <n-select
-            v-model:value="form.unit"
-            :options="[{ label: '分钟', value: 'minute' }, { label: '小时', value: 'hour' }, { label: '天', value: 'day' }]"
-            style="width: 110px; margin-left: 8px"
-          />
-        </n-form-item>
-
         <n-form-item label="单码卡密">
           <n-input-number v-model:value="form.multiplier" :min="1" :max="10000" style="width: 140px" />
           <span style="margin-left: 10px; font-size: 12px; color: #8b93a7">
@@ -190,7 +176,7 @@ onMounted(load)
 
         <n-form-item label="应付">
           <n-tag type="info">{{ formatYuan(total) }} 元</n-tag>
-          <span style="margin-left: 10px; font-size: 12px; color: #8b93a7">按模板单价 × 份数 × 数量（自定义时间再 × 数值）</span>
+          <span style="margin-left: 10px; font-size: 12px; color: #8b93a7">按模板单价 × 份数 × 数量</span>
         </n-form-item>
 
         <n-button type="primary" :loading="busy" @click="issue">生成</n-button>

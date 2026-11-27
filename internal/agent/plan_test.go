@@ -70,15 +70,15 @@ func TestIssueByPlanMultiplierPriced(t *testing.T) {
 	}
 }
 
-// 自定义时间按所选数值计费，否则填 100 天也按 1 份收钱。
-func TestIssueByPlanCustomPriced(t *testing.T) {
+// 代理不能发自定义时间：模板里就算配了 custom 价也要拒绝。
+func TestIssueByPlanRejectsCustom(t *testing.T) {
 	ctx := context.Background()
 	e := setup(t)
 	a := e.agent(t, "agcustom", 0, 10000, 0, -1)
 
 	planID, err := e.st.SaveAgentPlan(ctx, store.AgentPlan{
 		AppID: e.appID, Name: "p2", Active: 1,
-		Items: map[string]int64{"custom": 100},
+		Items: map[string]int64{"day": 300, "custom": 100},
 	}, e.now.Unix())
 	if err != nil {
 		t.Fatal(err)
@@ -87,15 +87,9 @@ func TestIssueByPlanCustomPriced(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res, err := e.svc.IssueByPlan(ctx, PlanIssueReq{
-		AgentID: a.ID, AppID: e.appID, Kind: "custom", Value: 3, Unit: "day",
-		Multiplier: 2, Qty: 1, DeviceLimit: 1,
-	})
-	if err != nil {
-		t.Fatalf("出卡: %v", err)
-	}
-	// 100 分/天 × 3 天 × 2 份 × 1 张 = 600 分
-	if res.Payable != 600 {
-		t.Fatalf("应付 = %d want 600", res.Payable)
+	if _, err := e.svc.IssueByPlan(ctx, PlanIssueReq{
+		AgentID: a.ID, AppID: e.appID, Kind: "custom", Value: 3, Unit: "day", Qty: 1,
+	}); err == nil {
+		t.Fatal("代理发自定义时间应被拒绝")
 	}
 }

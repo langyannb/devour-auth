@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import {
   NAlert, NButton, NCard, NForm, NFormItem, NInput, NSpace, NTag,
 } from 'naive-ui'
 import QRCode from 'qrcode'
 import { api } from '../api'
+import { formatTs } from '../utils'
 
 interface Me {
   id: number
@@ -20,6 +21,18 @@ interface SetupResp {
   issuer: string
 }
 
+interface OpsTask {
+  last_at: number
+  next_at: number
+}
+
+interface OpsStatus {
+  anchor: OpsTask
+  rollup: OpsTask
+  bills: OpsTask
+  backup: OpsTask & { configured: boolean }
+}
+
 const me = ref<Me | null>(null)
 const err = ref('')
 const notice = ref('')
@@ -32,6 +45,33 @@ const busy = ref(false)
 const disablePassword = ref('')
 const disableCode = ref('')
 const showDisable = ref(false)
+
+const ops = ref<OpsStatus | null>(null)
+
+const opsRows = computed(() => {
+  const o = ops.value
+  if (!o) return []
+  const t = (v: number) => formatTs(v)
+  return [
+    { name: '审计锚定', last: t(o.anchor.last_at), next: t(o.anchor.next_at), note: '每天 00:05 签名上一日链尾' },
+    { name: '日统计', last: t(o.rollup.last_at), next: t(o.rollup.next_at), note: '每天 00:07 汇总前一日数据' },
+    { name: '代理账单', last: t(o.bills.last_at), next: t(o.bills.next_at), note: '每月 1 日 01:10 生成上月账单' },
+    {
+      name: '备份',
+      last: o.backup.configured ? t(o.backup.last_at) : '未配置（systemd timer）',
+      next: o.backup.configured ? t(o.backup.next_at) : '—',
+      note: '每小时整点，GPG 加密',
+    },
+  ]
+})
+
+async function loadOps() {
+  try {
+    ops.value = await api.get<OpsStatus>('/admin/api/ops/status')
+  } catch (e) {
+    err.value = (e as Error).message
+  }
+}
 
 async function loadMe() {
   try {
@@ -94,7 +134,10 @@ async function disable() {
   }
 }
 
-onMounted(loadMe)
+onMounted(() => {
+  void loadMe()
+  void loadOps()
+})
 </script>
 
 <template>
@@ -106,6 +149,24 @@ onMounted(loadMe)
       <div v-if="me" style="display: flex; flex-wrap: wrap; gap: 12px 24px">
         <span>用户名：{{ me.username }}</span>
         <span>角色：{{ me.role }}</span>
+      </div>
+    </n-card>
+
+    <n-card title="定时任务" size="small" style="margin-bottom: 16px">
+      <div class="ops-table">
+        <div class="ops-row ops-head">
+          <span>任务</span>
+          <span>上次</span>
+          <span>下次</span>
+          <span>说明</span>
+        </div>
+        <div v-if="opsRows.length === 0" style="color: #888; padding: 8px 0">暂无状态</div>
+        <div v-for="row in opsRows" :key="row.name" class="ops-row">
+          <span>{{ row.name }}</span>
+          <span class="ops-time">{{ row.last }}</span>
+          <span class="ops-time">{{ row.next }}</span>
+          <span class="ops-note">{{ row.note }}</span>
+        </div>
       </div>
     </n-card>
 
@@ -163,3 +224,32 @@ onMounted(loadMe)
     </n-card>
   </div>
 </template>
+
+<style scoped>
+.ops-table {
+  overflow-x: auto;
+}
+.ops-row {
+  display: grid;
+  grid-template-columns: 72px 132px 132px minmax(160px, 1fr);
+  gap: 8px;
+  align-items: center;
+  padding: 8px 0;
+  font-size: 13px;
+  border-bottom: 1px solid rgba(18, 21, 28, 0.05);
+  min-width: 520px;
+}
+.ops-row:last-child {
+  border-bottom: none;
+}
+.ops-head {
+  color: #6b7280;
+  font-weight: 500;
+}
+.ops-time {
+  font-variant-numeric: tabular-nums;
+}
+.ops-note {
+  color: #8b93a7;
+}
+</style>

@@ -5,8 +5,13 @@ import { api } from '../api'
 import { formatTs } from '../utils'
 
 interface Hook { id: number; url: string; events: string; active: number; created_at: number }
+interface Delivery {
+  id: number; webhook_id: number; event: string; url: string; attempts: number
+  ok: boolean; status_code: number; error: string; created_at: number; finished_at: number
+}
 
 const rows = ref<Hook[]>([])
+const deliveries = ref<Delivery[]>([])
 const err = ref('')
 const notice = ref('')
 const secret = ref('')
@@ -27,7 +32,12 @@ async function load() {
   loading.value = true
   err.value = ''
   try {
-    rows.value = await api.get<Hook[]>('/admin/api/webhooks')
+    const [hooks, list] = await Promise.all([
+      api.get<Hook[]>('/admin/api/webhooks'),
+      api.get<Delivery[]>('/admin/api/webhooks/deliveries'),
+    ])
+    rows.value = hooks
+    deliveries.value = list
   } catch (e) { err.value = (e as Error).message } finally { loading.value = false }
 }
 
@@ -73,6 +83,23 @@ const cols: DataTableColumns<Hook> = [
   },
 ]
 
+function resultLabel(r: Delivery) {
+  if (r.ok) return `成功 ${r.status_code}`
+  if (r.status_code) return `失败 ${r.status_code}`
+  return `失败：${r.error || '无响应'}`
+}
+
+const deliveryCols: DataTableColumns<Delivery> = [
+  { title: '时间', key: 'created_at', width: 150, render: (r) => formatTs(r.created_at) },
+  { title: '事件', key: 'event', width: 120 },
+  { title: 'URL', key: 'url' },
+  { title: '尝试', key: 'attempts', width: 70 },
+  {
+    title: '结果', key: 'ok', width: 260,
+    render: (r) => h(NTag, { size: 'small', type: r.ok ? 'success' : 'error' }, { default: () => resultLabel(r) }),
+  },
+]
+
 onMounted(load)
 </script>
 
@@ -93,6 +120,9 @@ onMounted(load)
     </n-alert>
 
     <n-data-table :columns="cols" :data="rows" :loading="loading" size="small" :bordered="false" :scroll-x="820" />
+
+    <div style="margin: 20px 0 8px; font-weight: 600">最近投递</div>
+    <n-data-table :columns="deliveryCols" :data="deliveries" :loading="loading" size="small" :bordered="false" :scroll-x="860" />
 
     <n-modal v-model:show="showCreate" preset="card" title="新建回调" style="width: min(480px, 94vw)">
       <n-form label-placement="top">

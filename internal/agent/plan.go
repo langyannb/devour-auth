@@ -32,7 +32,7 @@ func unitSeconds(unit string) int64 {
 type PlanIssueReq struct {
 	AgentID     int64
 	AppID       int64
-	Kind        string // day|week|month|forever|custom
+	Kind        string // day|week|month|forever
 	Multiplier  int64
 	Value       int64
 	Unit        string
@@ -47,6 +47,10 @@ type PlanIssueReq struct {
 func (s *Service) IssueByPlan(ctx context.Context, req PlanIssueReq) (IssueResult, error) {
 	if req.Kind == "" {
 		return IssueResult{}, apierr.New(apierr.BadInput, "缺少卡类型")
+	}
+	// 代理只能发模板里的固定时长类型，自定义时间只由管理员发
+	if req.Kind == "custom" {
+		return IssueResult{}, apierr.New(apierr.BadInput, "代理不能发自定义时间的卡")
 	}
 	if req.Qty <= 0 {
 		req.Qty = 1
@@ -99,12 +103,6 @@ func (s *Service) IssueByPlan(ctx context.Context, req PlanIssueReq) (IssueResul
 	switch req.Kind {
 	case "forever":
 		duration = 0
-	case "custom":
-		v := req.Value
-		if v <= 0 {
-			v = 1
-		}
-		duration = v * unitSeconds(req.Unit) * req.Multiplier
 	default:
 		duration = KindBaseSeconds[req.Kind] * req.Multiplier
 	}
@@ -113,14 +111,6 @@ func (s *Service) IssueByPlan(ctx context.Context, req PlanIssueReq) (IssueResul
 	factor := req.Multiplier
 	if req.Kind == "forever" {
 		factor = 1
-	}
-	if req.Kind == "custom" {
-		// 自定义时间的单价按所选单位计：3 天 = 3 × 单价
-		v := req.Value
-		if v <= 0 {
-			v = 1
-		}
-		factor *= v
 	}
 	payable := unitPrice * int64(req.Qty) * factor
 	now := s.now()

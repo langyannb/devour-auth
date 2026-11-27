@@ -28,7 +28,7 @@ type env struct {
 	st *store.Store
 }
 
-func setup(t *testing.T) env {
+func setup(t *testing.T, tweak ...func(*httpapi.Options)) env {
 	t.Helper()
 	ctx := context.Background()
 	st, err := store.Open(ctx, filepath.Join(t.TempDir(), "test.db"))
@@ -58,13 +58,17 @@ func setup(t *testing.T) env {
 	if err != nil {
 		t.Fatal(err)
 	}
-	srv := httpapi.New(st, slog.New(slog.NewTextHandler(io.Discard, nil)), httpapi.Options{
+	opt := httpapi.Options{
 		Env:       "dev",
 		Static:    fstest.MapFS{"index.html": &fstest.MapFile{Data: []byte("<!doctype html><title>test</title>")}},
 		TicketKey: priv,
 		AdminHost: "admin.test",
 		AgentHost: "agent.test",
-	})
+	}
+	for _, f := range tweak {
+		f(&opt)
+	}
+	srv := httpapi.New(st, slog.New(slog.NewTextHandler(io.Discard, nil)), opt)
 	ts := httptest.NewServer(srv.Handler())
 	t.Cleanup(ts.Close)
 	return env{ts: ts, st: st}

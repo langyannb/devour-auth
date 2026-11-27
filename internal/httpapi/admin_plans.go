@@ -57,7 +57,7 @@ func (s *Server) savePlan(w http.ResponseWriter, r *http.Request) {
 	items := map[string]int64{}
 	for kind, price := range req.Items {
 		switch kind {
-		case "day", "week", "month", "forever", "custom":
+		case "day", "week", "month", "forever": // 自定义时间不给代理
 			if price > 0 {
 				items[kind] = price
 			}

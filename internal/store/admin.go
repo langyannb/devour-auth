@@ -170,6 +170,13 @@ func (s *Store) SetAdminTOTP(ctx context.Context, adminID int64, secret string) 
 	return err
 }
 
+// SetAdminIPAllow 写入登录 IP 白名单（空串 = 不限）。
+func (s *Store) SetAdminIPAllow(ctx context.Context, adminID int64, ipAllow string) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE admins SET ip_allow = NULLIF(?, '') WHERE id = ?`, ipAllow, adminID)
+	return err
+}
+
 // SetAdminCredentials 改用户名与密码哈希。
 func (s *Store) SetAdminCredentials(ctx context.Context, adminID int64, username, passHash string) error {
 	_, err := s.db.ExecContext(ctx,
