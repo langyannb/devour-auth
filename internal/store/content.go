@@ -63,6 +63,28 @@ func (s *Store) LatestRelease(ctx context.Context, appID int64) (Release, error)
 	return r, err
 }
 
+// UpdateRelease 改版本内容（不改 app_id 和发布时间）；返回是否命中。
+func (s *Store) UpdateRelease(ctx context.Context, id int64, r Release) (bool, error) {
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE releases SET version = ?, info = ?, url = ?, must = ?, rollout_bp = ? WHERE id = ?`,
+		r.Version, r.Info, r.URL, r.Must, r.RolloutBP, id)
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return n > 0, err
+}
+
+// DeleteRelease 删掉一条版本记录。
+func (s *Store) DeleteRelease(ctx context.Context, id int64) (bool, error) {
+	res, err := s.db.ExecContext(ctx, `DELETE FROM releases WHERE id = ?`, id)
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return n > 0, err
+}
+
 func (s *Store) SetReleaseActive(ctx context.Context, id int64, active bool) error {
 	v := 0
 	if active {
@@ -114,6 +136,28 @@ func (s *Store) ListNotices(ctx context.Context, appID int64, onlyActive bool) (
 		out = append(out, n)
 	}
 	return out, rows.Err()
+}
+
+// UpdateNotice 改公告内容；返回是否命中。
+func (s *Store) UpdateNotice(ctx context.Context, id int64, n Notice) (bool, error) {
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE notices SET kind = ?, title = ?, body = ? WHERE id = ?`,
+		n.Kind, n.Title, n.Body, id)
+	if err != nil {
+		return false, err
+	}
+	c, err := res.RowsAffected()
+	return c > 0, err
+}
+
+// DeleteNotice 删掉一条公告。
+func (s *Store) DeleteNotice(ctx context.Context, id int64) (bool, error) {
+	res, err := s.db.ExecContext(ctx, `DELETE FROM notices WHERE id = ?`, id)
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return n > 0, err
 }
 
 func (s *Store) SetNoticeActive(ctx context.Context, id int64, active bool) error {

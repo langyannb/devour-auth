@@ -219,9 +219,13 @@ func (s *Server) Handler() http.Handler {
 	// 运营内容
 	mux.HandleFunc("GET /admin/api/releases", s.requireAdmin(s.listReleases))
 	mux.HandleFunc("POST /admin/api/releases", s.requireAdmin(s.createRelease))
+	mux.HandleFunc("PUT /admin/api/releases/{id}", s.requireAdmin(s.updateRelease))
+	mux.HandleFunc("DELETE /admin/api/releases/{id}", s.requireAdmin(s.deleteRelease))
 	mux.HandleFunc("POST /admin/api/releases/{id}/toggle", s.requireAdmin(s.toggleRelease))
 	mux.HandleFunc("GET /admin/api/notices", s.requireAdmin(s.listNoticesAdmin))
 	mux.HandleFunc("POST /admin/api/notices", s.requireAdmin(s.createNotice))
+	mux.HandleFunc("PUT /admin/api/notices/{id}", s.requireAdmin(s.updateNotice))
+	mux.HandleFunc("DELETE /admin/api/notices/{id}", s.requireAdmin(s.deleteNotice))
 	mux.HandleFunc("POST /admin/api/notices/{id}/toggle", s.requireAdmin(s.toggleNotice))
 	mux.HandleFunc("GET /admin/api/flags", s.requireAdmin(s.listFlagsAdmin))
 	mux.HandleFunc("PUT /admin/api/flags", s.requireAdmin(s.setFlag))

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { NConfigProvider, dateZhCN, zhCN } from 'naive-ui'
 
 const router = useRouter()
 const ready = ref(false)
@@ -25,7 +26,9 @@ onMounted(async () => {
     <div class="boot-bar"><i></i></div>
     <p class="boot-tip">正在校验会话…</p>
   </div>
-  <router-view v-else />
+  <n-config-provider v-else :locale="zhCN" :date-locale="dateZhCN">
+    <router-view />
+  </n-config-provider>
 </template>
 
 <style>
