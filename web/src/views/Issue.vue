@@ -38,8 +38,6 @@ const form = ref({
 
 const custom = ref(false)
 const customText = ref('')
-const policyId = ref<number | null>(null)
-const policies = ref<Array<{ id: number; name: string; code: string }>>([])
 
 const unitLabel: Record<string, string> = { minute: '分钟', hour: '小时', day: '天' }
 
@@ -83,15 +81,7 @@ const customLines = computed(() =>
 )
 
 async function loadPolicies() {
-  try {
-    const apps = await api.get<Array<{ id: number }>>('/admin/api/apps')
-    const appId = apps[0]?.id ?? 1
-    policies.value = await api.get<Array<{ id: number; name: string; code: string }>>(
-      `/admin/api/policies?app_id=${appId}`,
-    )
-  } catch {
-    // 自定义卡密模式才需要
-  }
+  // 卡类型已合并进价格模板，这里不再预加载策略
 }
 
 async function generate() {
@@ -100,28 +90,12 @@ async function generate() {
   kamis.value = []
   busy.value = true
   try {
-    if (custom.value) {
-      if (!policyId.value) {
-        err.value = '自定义卡密需要先选一个卡类型（决定时长与权限）'
-        return
-      }
-      if (customLines.value.length === 0) {
-        err.value = '请每行填一个卡密'
-        return
-      }
-      const d = await api.post<{ batch_id: number; kamis: string[] }>('/admin/api/cards/generate', {
-        policy_id: policyId.value,
-        kamis: customLines.value,
-        qty: customLines.value.length,
-        note: form.value.note,
-      })
-      batchId.value = d.batch_id
-      kamis.value = d.kamis
-      notice.value = `已生成 ${d.kamis.length} 张自定义卡密`
+    if (custom.value && customLines.value.length === 0) {
+      err.value = '请每行填一个卡密'
       return
     }
 
-    const d = await api.post<{ batch_id: number; kamis: string[] }>('/admin/api/cards/quick', {
+    const payload: Record<string, unknown> = {
       kind: form.value.kind,
       multiplier: form.value.multiplier,
       value: form.value.value,
@@ -129,9 +103,15 @@ async function generate() {
       device_limit: form.value.deviceLimit,
       length: form.value.length,
       prefix: form.value.prefix,
-      qty: form.value.qty,
       note: form.value.note,
-    })
+    }
+    if (custom.value) {
+      payload.kamis = customLines.value
+      payload.qty = customLines.value.length
+    } else {
+      payload.qty = form.value.qty
+    }
+    const d = await api.post<{ batch_id: number; kamis: string[] }>('/admin/api/cards/quick', payload)
     batchId.value = d.batch_id
     kamis.value = d.kamis
     notice.value = `已生成 ${d.kamis.length} 张，每张 ${human(perCardSeconds.value)}`
@@ -180,11 +160,18 @@ onMounted(loadPolicies)
 
       <template v-if="custom">
         <n-form-item label="卡类型">
+          <n-select v-model:value="form.kind" :options="kindOptions" />
+        </n-form-item>
+        <n-form-item v-if="form.kind === 'custom'" label="自定义时长">
+          <n-input-number v-model:value="form.value" :min="1" :max="100000" style="width: 140px" />
           <n-select
-            v-model:value="policyId"
-            :options="policies.map((p) => ({ label: `${p.name}（${p.code}）`, value: p.id }))"
-            placeholder="决定时长与权限"
+            v-model:value="form.unit"
+            :options="[{ label: '分钟', value: 'minute' }, { label: '小时', value: 'hour' }, { label: '天', value: 'day' }]"
+            style="width: 110px; margin-left: 8px"
           />
+        </n-form-item>
+        <n-form-item label="单码卡密">
+          <n-input-number v-model:value="form.multiplier" :min="1" :max="10000" style="width: 140px" />
         </n-form-item>
         <n-form-item label="卡密列表">
           <n-input v-model:value="customText" type="textarea" :rows="8" placeholder="VIP-0001&#10;VIP-0002" />
@@ -195,6 +182,9 @@ onMounted(loadPolicies)
             <input type="file" accept=".csv,text/csv,text/plain" @change="onFile" />
           </label>
           <n-tag size="small" style="margin-left: 10px">{{ customLines.length }} 张</n-tag>
+        </n-form-item>
+        <n-form-item label="设备绑定数量">
+          <n-input-number v-model:value="form.deviceLimit" :min="1" :max="100" />
         </n-form-item>
       </template>
 

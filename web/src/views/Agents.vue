@@ -27,11 +27,11 @@ const notice = ref('')
 const loading = ref(false)
 
 const showCreate = ref(false)
-const createForm = ref({ name: '', password: '', discount: 70, rebate: 0, quotaYuan: 0 })
+const createForm = ref({ name: '', password: '', quotaYuan: 0 })
 const busy = ref(false)
 
 const editTarget = ref<Agent | null>(null)
-const editForm = ref({ discount: 70, rebate: 0, quotaYuan: 0 })
+const editForm = ref({ quotaYuan: 0 })
 
 const statusTag = (s: string) =>
   h(NTag, { size: 'small', type: s === 'active' ? 'success' : 'error' },
@@ -41,8 +41,6 @@ const columns: DataTableColumns<Agent> = [
   { title: 'ID', key: 'id', width: 60 },
   { title: '代理名', key: 'name' },
   { title: '层级', key: 'level', width: 70, render: (r) => `L${r.level}` },
-  { title: '折扣', key: 'discount_bp', width: 90, render: (r) => `${(r.discount_bp / 1000).toFixed(1)} 折` },
-  { title: '返点', key: 'rebate_bp', width: 80, render: (r) => `${(r.rebate_bp / 100).toFixed(1)}%` },
   {
     title: '月额度',
     key: 'monthly_quota_cents',
@@ -59,7 +57,7 @@ const columns: DataTableColumns<Agent> = [
       h(NSpace, { size: 4 }, {
         default: () => [
           h(NButton, { size: 'tiny', onClick: () => router.push(`/agents/${r.id}`) }, { default: () => '价格表' }),
-          h(NButton, { size: 'tiny', onClick: () => openEdit(r) }, { default: () => '调折扣' }),
+          h(NButton, { size: 'tiny', onClick: () => openEdit(r) }, { default: () => '改额度' }),
           h(NButton, {
             size: 'tiny',
             type: r.status === 'active' ? 'error' : 'success',
@@ -90,13 +88,11 @@ async function create() {
     await api.post('/admin/api/agents', {
       name: createForm.value.name,
       password: createForm.value.password,
-      discount_bp: Math.round(createForm.value.discount * 100),
-      rebate_bp: Math.round(createForm.value.rebate * 100),
       monthly_quota_cents: Math.round(createForm.value.quotaYuan * 100),
     })
     notice.value = `已创建代理 ${createForm.value.name}`
     showCreate.value = false
-    createForm.value = { name: '', password: '', discount: 70, rebate: 0, quotaYuan: 0 }
+    createForm.value = { name: '', password: '', quotaYuan: 0 }
     await load()
   } catch (e) {
     err.value = (e as Error).message
@@ -107,11 +103,7 @@ async function create() {
 
 function openEdit(a: Agent) {
   editTarget.value = a
-  editForm.value = {
-    discount: a.discount_bp / 100,
-    rebate: a.rebate_bp / 100,
-    quotaYuan: a.monthly_quota_cents / 100,
-  }
+  editForm.value = { quotaYuan: a.monthly_quota_cents / 100 }
 }
 
 async function saveEdit() {
@@ -120,8 +112,6 @@ async function saveEdit() {
   busy.value = true
   try {
     await api.patch(`/admin/api/agents/${editTarget.value.id}`, {
-      discount_bp: Math.round(editForm.value.discount * 100),
-      rebate_bp: Math.round(editForm.value.rebate * 100),
       monthly_quota_cents: Math.round(editForm.value.quotaYuan * 100),
     })
     notice.value = '已更新代理策略'
@@ -166,12 +156,6 @@ onMounted(load)
         <n-form-item label="密码（至少 12 位）">
           <n-input v-model:value="createForm.password" type="password" show-password-on="click" />
         </n-form-item>
-        <n-form-item label="折扣（%，70 = 7 折）">
-          <n-input-number v-model:value="createForm.discount" :min="1" :max="100" />
-        </n-form-item>
-        <n-form-item label="返点（%）">
-          <n-input-number v-model:value="createForm.rebate" :min="0" :max="100" />
-        </n-form-item>
         <n-form-item label="月额度（元，0 = 不限）">
           <n-input-number v-model:value="createForm.quotaYuan" :min="0" />
         </n-form-item>
@@ -182,12 +166,6 @@ onMounted(load)
     <n-modal :show="!!editTarget" preset="card" title="调整代理策略" style="width: min(420px, 94vw)"
       @update:show="(v: boolean) => { if (!v) editTarget = null }">
       <n-form label-placement="top">
-        <n-form-item label="折扣（%）">
-          <n-input-number v-model:value="editForm.discount" :min="1" :max="100" />
-        </n-form-item>
-        <n-form-item label="返点（%）">
-          <n-input-number v-model:value="editForm.rebate" :min="0" :max="100" />
-        </n-form-item>
         <n-form-item label="月额度（元，0 = 不限）">
           <n-input-number v-model:value="editForm.quotaYuan" :min="0" />
         </n-form-item>

@@ -13,15 +13,16 @@ import (
 // 单码卡密（Multiplier）= 一张卡的时长倍数：周卡 + 2 → 2 周。
 // 卡密数量（Qty）= 生成几张卡，两者互不影响。
 type quickReq struct {
-	Kind        string `json:"kind"` // day|week|month|forever|custom
-	Multiplier  int64  `json:"multiplier"`
-	Value       int64  `json:"value"` // custom 用
-	Unit        string `json:"unit"`  // minute|hour|day（custom 用）
-	DeviceLimit int64  `json:"device_limit"`
-	Length      int    `json:"length"`
-	Prefix      string `json:"prefix"`
-	Qty         int    `json:"qty"`
-	Note        string `json:"note"`
+	Kind        string   `json:"kind"` // day|week|month|forever|custom
+	Multiplier  int64    `json:"multiplier"`
+	Value       int64    `json:"value"` // custom 用
+	Unit        string   `json:"unit"`  // minute|hour|day（custom 用）
+	DeviceLimit int64    `json:"device_limit"`
+	Length      int      `json:"length"`
+	Prefix      string   `json:"prefix"`
+	Qty         int      `json:"qty"`
+	Note        string   `json:"note"`
+	Kamis       []string `json:"kamis"` // 自定义卡密时忽略随机生成
 }
 
 // baseSeconds 各类型的单码基础时长。
@@ -113,6 +114,7 @@ func (s *Server) quickGenerate(w http.ResponseWriter, r *http.Request) {
 		Actor:           fmt.Sprintf("%s:%d", c.Admin.Role, c.Admin.ID),
 		IP:              clientIP(r),
 		Note:            req.Note,
+		Kamis:           req.Kamis,
 	})
 	if err != nil {
 		s.writeAPIError(w, err)

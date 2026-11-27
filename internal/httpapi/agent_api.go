@@ -449,9 +449,8 @@ func (s *Server) createAgent(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, CodeBadInput, "代理名必填，密码至少 12 位")
 		return
 	}
-	if req.DiscountBP <= 0 || req.DiscountBP > 10000 {
-		writeErr(w, http.StatusBadRequest, CodeBadInput, "折扣基点需在 1..10000")
-		return
+	if req.DiscountBP <= 0 {
+		req.DiscountBP = 10000 // 折扣已废弃，价格由模板决定
 	}
 	hash, err := auth.HashPassword(req.Password)
 	if err != nil {

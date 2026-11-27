@@ -21,7 +21,6 @@ const menu = computed<MenuOption[]>(() => [
   { label: '设备', key: '/devices' },
   { label: '在线', key: '/sessions' },
   { label: '黑名单', key: '/blacklist' },
-  { label: '卡类型', key: '/policies' },
   { label: '权限', key: '/entitlements' },
   { label: '代理', key: '/agents' },
   { label: '价格模板', key: '/plans' },
