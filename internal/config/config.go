@@ -7,6 +7,7 @@ type Config struct {
 	ListenAddr string // DEVOUR_LISTEN
 	DBPath     string // DEVOUR_DB
 	Env        string // DEVOUR_ENV: dev | prod
+	AdminUser  string // DEVOUR_ADMIN_USER，仅 init-admin 使用
 }
 
 func Load() Config {
@@ -14,6 +15,7 @@ func Load() Config {
 		ListenAddr: envOr("DEVOUR_LISTEN", "127.0.0.1:6760"),
 		DBPath:     envOr("DEVOUR_DB", "data/app.db"),
 		Env:        envOr("DEVOUR_ENV", "dev"),
+		AdminUser:  envOr("DEVOUR_ADMIN_USER", "admin"),
 	}
 }
 

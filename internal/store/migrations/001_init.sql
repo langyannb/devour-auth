@@ -31,6 +31,7 @@ CREATE TABLE admin_sessions (
   created_at    INTEGER NOT NULL,
   last_seen     INTEGER NOT NULL,
   expires_at    INTEGER NOT NULL,
+  reauth_until  INTEGER NOT NULL DEFAULT 0,
   revoked_at    INTEGER
 );
 

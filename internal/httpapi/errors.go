@@ -37,6 +37,10 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	_ = json.NewEncoder(w).Encode(v)
 }
 
+func writeData(w http.ResponseWriter, v any) {
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "data": v})
+}
+
 func writeErr(w http.ResponseWriter, status int, code, msg string) {
 	writeJSON(w, status, errorBody{
 		OK:         false,

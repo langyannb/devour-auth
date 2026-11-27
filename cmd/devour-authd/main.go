@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -17,8 +18,24 @@ import (
 )
 
 func main() {
-	if err := run(); err != nil {
-		slog.Error("启动失败", "err", err)
+	cmd := "serve"
+	if len(os.Args) > 1 {
+		cmd = os.Args[1]
+	}
+
+	var err error
+	switch cmd {
+	case "serve":
+		err = run()
+	case "init-admin":
+		err = runInitAdmin(config.Load())
+	default:
+		fmt.Fprintf(os.Stderr, "用法: %s [serve|init-admin]\n", os.Args[0])
+		os.Exit(2)
+	}
+
+	if err != nil {
+		slog.Error("退出", "err", err)
 		os.Exit(1)
 	}
 }
@@ -47,7 +64,7 @@ func run() error {
 
 	srv := &http.Server{
 		Addr:              cfg.ListenAddr,
-		Handler:           httpapi.New(st.DB(), log).Handler(),
+		Handler:           httpapi.New(st, log, cfg.Env).Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
 		IdleTimeout:       60 * time.Second,
 	}
