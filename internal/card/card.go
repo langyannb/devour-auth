@@ -137,6 +137,8 @@ type GenerateReq struct {
 	Actor     string // admin:1
 	IP        string
 	Note      string
+	// Kamis 非空时使用调用方指定的卡密（自定义 / CSV 导入），Qty 必须与之一致。
+	Kamis []string
 	// Hook 在同一事务提交前执行，用于代理记账等需要与发卡原子化的写入。
 	Hook func(ctx context.Context, tx *sql.Tx, batchID int64) error
 }
@@ -147,8 +149,33 @@ type GenerateResult struct {
 }
 
 func (s *Service) Generate(ctx context.Context, req GenerateReq) (GenerateResult, error) {
+	custom := len(req.Kamis) > 0
+	if custom {
+		if req.Qty == 0 {
+			req.Qty = len(req.Kamis)
+		}
+		if req.Qty != len(req.Kamis) {
+			return GenerateResult{}, fmt.Errorf("%w: 自定义卡密数量与 qty 不一致", ErrInvalid)
+		}
+	}
 	if req.Qty < 1 || req.Qty > MaxBatchQty {
 		return GenerateResult{}, fmt.Errorf("%w: 单批数量需在 1..%d", ErrInvalid, MaxBatchQty)
+	}
+	if custom {
+		seen := make(map[string]bool, len(req.Kamis))
+		for _, k := range req.Kamis {
+			k = strings.TrimSpace(k)
+			if len(k) < 4 || len(k) > 64 {
+				return GenerateResult{}, fmt.Errorf("%w: 卡密长度需在 4..64：%s", ErrInvalid, k)
+			}
+			if strings.ContainsAny(k, " \t\r\n") {
+				return GenerateResult{}, fmt.Errorf("%w: 卡密不能含空白字符", ErrInvalid)
+			}
+			if seen[k] {
+				return GenerateResult{}, fmt.Errorf("%w: 本次提交里有重复卡密：%s", ErrInvalid, k)
+			}
+			seen[k] = true
+		}
 	}
 	p, err := s.st.PolicyByID(ctx, req.PolicyID)
 	if err != nil {
@@ -193,10 +220,20 @@ func (s *Service) Generate(ctx context.Context, req GenerateReq) (GenerateResult
 	kamis := make([]string, 0, req.Qty)
 	for i := 0; i < req.Qty; i++ {
 		inserted := false
-		for attempt := 0; attempt < 5; attempt++ {
-			kami, err := NewKami(req.Prefix)
-			if err != nil {
-				return GenerateResult{}, err
+		attempts := 5
+		if custom {
+			attempts = 1 // 自定义卡密重复就直接报错，不重试
+		}
+		for attempt := 0; attempt < attempts; attempt++ {
+			var kami string
+			if custom {
+				kami = strings.TrimSpace(req.Kamis[i])
+			} else {
+				var err error
+				kami, err = NewKami(req.Prefix)
+				if err != nil {
+					return GenerateResult{}, err
+				}
 			}
 			_, err = s.st.InsertCard(ctx, tx, store.Card{
 				AppID:            req.AppID,
@@ -374,6 +411,35 @@ func (s *Service) Unbind(ctx context.Context, id int64, ch StatusChange) error {
 func (s *Service) ResetRebind(ctx context.Context, id int64, ch StatusChange) error {
 	return s.mutate(ctx, id, ch, func(c *store.Card, now int64) error {
 		c.RebindUsed = 0
+		return nil
+	})
+}
+
+// SetDeviceLimit 改单卡设备上限，同时改快照（老卡也按新上限执行）。
+func (s *Service) SetDeviceLimit(ctx context.Context, id, limit int64, ch StatusChange) error {
+	if limit < 1 || limit > 100 {
+		return fmt.Errorf("%w: 设备上限需在 1..100", ErrInvalid)
+	}
+	return s.mutate(ctx, id, ch, func(c *store.Card, now int64) error {
+		var snap Snapshot
+		if err := json.Unmarshal([]byte(c.SnapshotJSON), &snap); err != nil {
+			return err
+		}
+		snap.DeviceLimit = limit
+		raw, err := json.Marshal(snap)
+		if err != nil {
+			return err
+		}
+		c.DeviceLimit = limit
+		c.SnapshotJSON = string(raw)
+		return nil
+	})
+}
+
+// SetNote 只改客服备注。
+func (s *Service) SetNote(ctx context.Context, id int64, note string, ch StatusChange) error {
+	return s.mutate(ctx, id, ch, func(c *store.Card, now int64) error {
+		c.Note = note
 		return nil
 	})
 }

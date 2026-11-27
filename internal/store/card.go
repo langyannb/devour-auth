@@ -83,10 +83,12 @@ func (s *Store) InsertCard(ctx context.Context, tx *sql.Tx, c Card) (int64, erro
 func updateCard(ctx context.Context, ex Executor, c Card) error {
 	_, err := ex.ExecContext(ctx,
 		`UPDATE cards SET status=?, device_limit=?, expire_at=?, remain_times=?, points=?,
-		   remaining_seconds=?, paused=?, rebind_used=?, rebind_at=?, note=?, activated_at=?, banned_at=?
+		   remaining_seconds=?, paused=?, rebind_used=?, rebind_at=?, snapshot_json=?,
+		   note=?, activated_at=?, banned_at=?
 		 WHERE id = ?`,
 		c.Status, c.DeviceLimit, c.ExpireAt, c.RemainTimes, c.Points,
-		c.RemainingSeconds, c.Paused, c.RebindUsed, c.RebindAt, c.Note, c.ActivatedAt, c.BannedAt, c.ID)
+		c.RemainingSeconds, c.Paused, c.RebindUsed, c.RebindAt, c.SnapshotJSON,
+		c.Note, c.ActivatedAt, c.BannedAt, c.ID)
 	return err
 }
 

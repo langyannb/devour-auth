@@ -384,10 +384,11 @@ func cardJSON(c store.Card) map[string]any {
 }
 
 type generateReq struct {
-	PolicyID int64  `json:"policy_id"`
-	Qty      int    `json:"qty"`
-	Prefix   string `json:"prefix"`
-	Note     string `json:"note"`
+	PolicyID int64    `json:"policy_id"`
+	Qty      int      `json:"qty"`
+	Prefix   string   `json:"prefix"`
+	Note     string   `json:"note"`
+	Kamis    []string `json:"kamis"` // 自定义卡密 / CSV 导入
 }
 
 func (s *Server) generateCards(w http.ResponseWriter, r *http.Request) {
@@ -408,6 +409,7 @@ func (s *Server) generateCards(w http.ResponseWriter, r *http.Request) {
 		Actor:     fmt.Sprintf("%s:%d", c.Admin.Role, c.Admin.ID),
 		IP:        clientIP(r),
 		Note:      req.Note,
+		Kamis:     req.Kamis,
 	})
 	if err != nil {
 		if errors.Is(err, card.ErrInvalid) {

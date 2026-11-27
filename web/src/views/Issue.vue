@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
-import { NAlert, NButton, NCard, NForm, NFormItem, NInputNumber, NInput, NSelect, NSpace, NTag } from 'naive-ui'
+import { computed, onMounted, ref } from 'vue'
+import {
+  NAlert, NButton, NCard, NForm, NFormItem, NInputNumber, NInput, NSelect, NSpace, NSwitch, NTag,
+} from 'naive-ui'
 import { api } from '../api'
 import { kindLabels } from '../utils'
 import { useMobile } from '../useMobile'
@@ -15,7 +17,6 @@ interface Policy {
 }
 
 const policies = ref<Policy[]>([])
-const isMobile = useMobile()
 const policyId = ref<number | null>(null)
 const qty = ref(10)
 const prefix = ref('DV')
@@ -24,6 +25,17 @@ const busy = ref(false)
 const err = ref('')
 const kamis = ref<string[]>([])
 const batchId = ref(0)
+const isMobile = useMobile()
+
+const custom = ref(false)
+const customText = ref('')
+
+const customLines = computed(() =>
+  customText.value
+    .split('\n')
+    .map((s) => s.trim())
+    .filter(Boolean),
+)
 
 const options = () =>
   policies.value.map((p) => ({
@@ -48,14 +60,25 @@ async function generate() {
     err.value = '请选择卡类型'
     return
   }
+  const payload: Record<string, unknown> = {
+    policy_id: policyId.value,
+    prefix: prefix.value,
+    note: note.value,
+  }
+  if (custom.value) {
+    if (customLines.value.length === 0) {
+      err.value = '请每行填一个卡密'
+      return
+    }
+    payload.kamis = customLines.value
+    payload.qty = customLines.value.length
+  } else {
+    payload.qty = qty.value
+  }
+
   busy.value = true
   try {
-    const d = await api.post<{ batch_id: number; kamis: string[] }>('/admin/api/cards/generate', {
-      policy_id: policyId.value,
-      qty: qty.value,
-      prefix: prefix.value,
-      note: note.value,
-    })
+    const d = await api.post<{ batch_id: number; kamis: string[] }>('/admin/api/cards/generate', payload)
     batchId.value = d.batch_id
     kamis.value = d.kamis
   } catch (e) {
@@ -75,16 +98,41 @@ onMounted(loadPolicies)
 <template>
   <n-card title="发卡">
     <n-alert v-if="err" type="error" style="margin-bottom: 12px">{{ err }}</n-alert>
-    <n-form :label-placement="isMobile ? 'top' : 'left'" label-width="90">
+    <n-form :label-placement="isMobile ? 'top' : 'left'" label-width="110">
       <n-form-item label="卡类型">
         <n-select v-model:value="policyId" :options="options()" placeholder="选择卡类型" />
       </n-form-item>
-      <n-form-item label="数量">
-        <n-input-number v-model:value="qty" :min="1" :max="500" />
+
+      <n-form-item label="自定义卡密">
+        <n-switch v-model:value="custom" />
+        <span style="margin-left: 10px; font-size: 12px; color: #8b93a7">
+          关闭则随机生成；开启后每行一个，支持批量粘贴
+        </span>
       </n-form-item>
-      <n-form-item label="前缀">
-        <n-input v-model:value="prefix" placeholder="DV" style="width: 160px" />
-      </n-form-item>
+
+      <template v-if="custom">
+        <n-form-item label="卡密列表">
+          <n-input
+            v-model:value="customText"
+            type="textarea"
+            :rows="8"
+            placeholder="VIP-0001&#10;VIP-0002&#10;VIP-0003"
+          />
+        </n-form-item>
+        <n-form-item label="将生成">
+          <n-tag size="small">{{ customLines.length }} 张</n-tag>
+        </n-form-item>
+      </template>
+
+      <template v-else>
+        <n-form-item label="数量">
+          <n-input-number v-model:value="qty" :min="1" :max="500" />
+        </n-form-item>
+        <n-form-item label="前缀">
+          <n-input v-model:value="prefix" placeholder="DV" style="width: 160px" />
+        </n-form-item>
+      </template>
+
       <n-form-item label="备注">
         <n-input v-model:value="note" placeholder="客服记录，不进审计" />
       </n-form-item>
@@ -92,7 +140,7 @@ onMounted(loadPolicies)
     </n-form>
 
     <template v-if="kamis.length">
-      <n-space align="center" style="margin: 20px 0 8px">
+      <n-space align="center" style="margin: 20px 0 8px" :wrap="true">
         <n-tag type="success">批次 {{ batchId }}</n-tag>
         <span>共 {{ kamis.length }} 张</span>
         <n-button size="small" @click="copyAll">复制全部</n-button>

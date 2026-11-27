@@ -66,6 +66,8 @@ const notice = ref('')
 const loading = ref(false)
 
 const showExtend = ref(false)
+const showLimit = ref(false)
+const limitVal = ref(1)
 const ext = ref({ days: 0, points: 0, times: 0, seconds: 0 })
 const busy = ref(false)
 
@@ -111,6 +113,26 @@ async function extend() {
     notice.value = '已续期'
     showExtend.value = false
     ext.value = { days: 0, points: 0, times: 0, seconds: 0 }
+    await load()
+  } catch (e) {
+    err.value = (e as Error).message
+  } finally {
+    busy.value = false
+  }
+}
+
+function openLimit() {
+  limitVal.value = card.value?.device_limit ?? 1
+  showLimit.value = true
+}
+
+async function saveLimit() {
+  busy.value = true
+  err.value = ''
+  try {
+    await api.patch(`/admin/api/cards/${id}`, { device_limit: limitVal.value })
+    notice.value = '设备上限已更新，立即生效'
+    showLimit.value = false
     await load()
   } catch (e) {
     err.value = (e as Error).message
@@ -199,6 +221,7 @@ onMounted(load)
 
       <n-space style="margin-top: 14px" :wrap="true">
         <n-button size="small" type="primary" :loading="busy" @click="showExtend = true">续期 / 加点</n-button>
+        <n-button size="small" :loading="busy" @click="openLimit">改设备上限</n-button>
         <n-button size="small" :loading="busy" @click="act('unbind')">清空设备</n-button>
         <n-button size="small" :loading="busy" @click="act('reset-rebind')">重置换绑次数</n-button>
         <n-button size="small" type="error" :loading="busy" @click="act('ban')">封禁</n-button>
@@ -214,6 +237,14 @@ onMounted(load)
     <n-card title="会话" size="small">
       <n-data-table :columns="sessionCols" :data="sessions" size="small" :bordered="false" :scroll-x="700" />
     </n-card>
+
+    <n-modal v-model:show="showLimit" preset="card" title="修改设备上限" style="width: min(360px, 94vw)">
+      <n-space vertical>
+        <span style="font-size: 13px; color: #666">当前 {{ card?.device_limit }} 台，改完立即对所有登录生效。</span>
+        <n-input-number v-model:value="limitVal" :min="1" :max="100" />
+        <n-button type="primary" :loading="busy" block @click="saveLimit">保存</n-button>
+      </n-space>
+    </n-modal>
 
     <n-modal v-model:show="showExtend" preset="card" title="续期 / 加点" style="width: min(420px, 94vw)">
       <n-space vertical>
