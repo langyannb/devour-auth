@@ -5,7 +5,7 @@ import {
   NButton, NDrawer, NDrawerContent, NLayout, NLayoutContent, NLayoutHeader, NLayoutSider,
   NMenu, NSelect, type MenuOption,
 } from 'naive-ui'
-import { api, authed, getCurrentApp, setCurrentApp } from '../api'
+import { api, getCSRF, getCurrentApp, markSignedOut, setCurrentApp, tryRestore } from '../api'
 import { useMobile } from '../useMobile'
 import ReauthDialog from './ReauthDialog.vue'
 
@@ -89,12 +89,15 @@ function onMenu(key: string) {
 
 async function logout() {
   try {
+    // 新标签页里 CSRF 可能还没回填，先取一次再退，否则请求 403、服务端会话还在
+    if (!getCSRF()) await tryRestore()
     await api.post('/admin/api/logout')
   } catch {
-    // 会话已失效也要回到登录页
+    // 会话已失效也继续走完本地清理
   }
-  authed.value = false
+  markSignedOut()
   sessionStorage.removeItem('devour_user')
+  sessionStorage.removeItem('devour_csrf')
   router.push('/login')
 }
 

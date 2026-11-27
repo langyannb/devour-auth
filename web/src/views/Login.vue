@@ -2,7 +2,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { NAlert, NButton, NCard, NForm, NFormItem, NInput } from 'naive-ui'
-import { api, authed, setCSRF } from '../api'
+import { api, authed, markSignedIn, setCSRF } from '../api'
 
 const router = useRouter()
 const username = ref('')
@@ -28,6 +28,7 @@ async function submit() {
     setCSRF(d.csrf_token)
     sessionStorage.setItem('devour_user', `${d.admin.username} · ${d.admin.role}`)
     authed.value = true
+    markSignedIn()
     router.push('/cards')
   } catch (e) {
     err.value = (e as Error).message

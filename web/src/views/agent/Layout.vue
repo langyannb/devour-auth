@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { NButton, NDrawer, NDrawerContent, NLayout, NLayoutContent, NLayoutHeader, NLayoutSider, NMenu, type MenuOption } from 'naive-ui'
-import { agentApi, agentAuthed } from '../../api'
+import { agentApi, getCSRF, markSignedOut, tryRestoreAgent } from '../../api'
 import { useMobile } from '../../useMobile'
 
 const router = useRouter()
@@ -27,12 +27,14 @@ function onMenu(key: string) {
 
 async function logout() {
   try {
+    if (!getCSRF('agent')) await tryRestoreAgent()
     await agentApi.post('/agent/api/logout')
   } catch {
-    // 已失效也回登录页
+    // 已失效也继续走完本地清理
   }
-  agentAuthed.value = false
+  markSignedOut()
   sessionStorage.removeItem('devour_agent_name')
+  sessionStorage.removeItem('devour_agent_csrf')
   router.push('/login')
 }
 

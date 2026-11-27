@@ -16,6 +16,18 @@ export function setCurrentApp(id: string) {
 }
 export const agentAuthed = ref(false)
 
+// 主动退出后，本次页面生命周期内不再尝试恢复会话，
+// 否则退出请求失败时路由守卫会立刻把人送回后台（看起来像「退出没反应」）。
+let signedOut = false
+export function markSignedOut() {
+  signedOut = true
+  authed.value = false
+  agentAuthed.value = false
+}
+export function markSignedIn() {
+  signedOut = false
+}
+
 // 敏感操作需要 5 分钟内重新验证；请求层遇到 403 就挂起等用户验证完再重试一次。
 export const reauthState = {
   show: ref(false),
@@ -127,6 +139,7 @@ export const agentApi = {
 }
 
 export async function tryRestore(): Promise<boolean> {
+  if (signedOut) return false
   try {
     const me = await request<{ csrf_token?: string; username?: string; role?: string }>('/admin/api/me')
     if (me?.csrf_token) setCSRF(me.csrf_token)
@@ -141,6 +154,7 @@ export async function tryRestore(): Promise<boolean> {
 }
 
 export async function tryRestoreAgent(): Promise<boolean> {
+  if (signedOut) return false
   try {
     const me = await request<{ name?: string; level?: number }>('/agent/api/me', {}, 'agent')
     if (me?.name) sessionStorage.setItem('devour_agent_name', `${me.name} · L${me.level ?? 1}`)

@@ -5,7 +5,7 @@ import { agentAuthed, authed, tryRestore, tryRestoreAgent } from './api'
 // 其余 → 官网/查卡。本地开发用 ?role=agent 切到代理端。
 const host = location.hostname
 const forced = new URLSearchParams(location.search).get('role')
-const isUnbind = host.startsWith('unbind.')
+const isUnbind = host.startsWith('unbind.') || forced === 'unbind'
 const isAgent = host.startsWith('agent.') || forced === 'agent'
 // ?role=public 本地看官网首页（默认 127.0.0.1 走管理端）
 const isPublic = forced === 'public'
@@ -13,7 +13,7 @@ const isAdmin = host.startsWith('admin.') || forced === 'admin' ||
   host === 'localhost' || host === '127.0.0.1' || host === ''
 
 const adminRoutes: RouteRecordRaw[] = [
-  { path: '/login', component: () => import('./views/Login.vue') },
+  { path: '/login', meta: { title: '登录' }, component: () => import('./views/Login.vue') },
   {
     path: '/',
     component: () => import('./views/Layout.vue'),
@@ -47,7 +47,7 @@ const adminRoutes: RouteRecordRaw[] = [
 ]
 
 const agentRoutes: RouteRecordRaw[] = [
-  { path: '/login', component: () => import('./views/agent/Login.vue') },
+  { path: '/login', meta: { title: '登录' }, component: () => import('./views/agent/Login.vue') },
   // 下级代理专属链接：agent.域名/<slug>
   { path: '/xj/:code', name: 'agent-invite', component: () => import('./views/agent/Invite.vue') },
   { path: '/:code', redirect: (to) => `/xj/${to.params.code}` },
@@ -68,13 +68,13 @@ const agentRoutes: RouteRecordRaw[] = [
 ]
 
 const publicRoutes: RouteRecordRaw[] = [
-  { path: '/', component: () => import('./views/public/Landing.vue') },
-  { path: '/query', component: () => import('./views/public/Query.vue') },
+  { path: '/', meta: { title: '自托管授权服务' }, component: () => import('./views/public/Landing.vue') },
+  { path: '/query', meta: { title: '卡密查询' }, component: () => import('./views/public/Query.vue') },
 ]
 
 // 解绑页单独一个域，只挂这一条路由，任何其它路径回首页。
 const unbindRoutes: RouteRecordRaw[] = [
-  { path: '/', component: () => import('./views/public/Unbind.vue') },
+  { path: '/', meta: { title: '设备解绑' }, component: () => import('./views/public/Unbind.vue') },
   { path: '/:pathMatch(.*)*', redirect: '/' },
 ]
 
@@ -99,6 +99,15 @@ router.beforeEach(async (to) => {
   const ok = authed.value || (await tryRestore())
   if (!ok) return to.path === '/login' ? true : '/login'
   return to.path === '/login' ? '/cards' : true
+})
+
+// 浏览器标题跟着页面走：管理端/代理端带端名，官网带品牌
+router.afterEach((to) => {
+  const title = to.meta.title as string | undefined
+  const port = isAgent ? '代理端' : isAdmin && !isPublic && !isUnbind ? '管理端' : ''
+  if (title && port) document.title = `${title} · Devour ${port}`
+  else if (title) document.title = `${title} · Devour Auth`
+  else document.title = 'Devour Auth'
 })
 
 export default router

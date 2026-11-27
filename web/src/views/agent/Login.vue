@@ -2,7 +2,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { NAlert, NButton, NCard, NForm, NFormItem, NInput } from 'naive-ui'
-import { agentApi, agentAuthed, setCSRF } from '../../api'
+import { agentApi, agentAuthed, markSignedIn, setCSRF } from '../../api'
 
 const router = useRouter()
 const name = ref('')
@@ -28,6 +28,7 @@ async function submit() {
     setCSRF(d.csrf_token, 'agent')
     sessionStorage.setItem('devour_agent_name', `${d.name} · L${d.level}`)
     agentAuthed.value = true
+    markSignedIn()
     router.push('/cards')
   } catch (e) {
     err.value = (e as Error).message
