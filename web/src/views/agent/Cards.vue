@@ -62,6 +62,7 @@ const columns = computed<DataTableColumns<Card>>(() => [
     render: (r) => {
       if (r.kind === 'credit') return `${r.points} 点`
       if (r.kind === 'count') return `${r.remain_times} 次`
+      if (r.kind === 'timed') return `${Math.round(r.remaining_seconds / 60)} 分`
       return '—'
     },
   },

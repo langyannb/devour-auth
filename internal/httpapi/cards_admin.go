@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"encoding/csv"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -125,13 +126,37 @@ func (s *Server) batchCards(w http.ResponseWriter, r *http.Request) {
 
 // exportCards 导出 CSV（带 BOM，Excel 直接打开不乱码）。
 func (s *Server) exportCards(w http.ResponseWriter, r *http.Request) {
-	cards, _, err := s.st.ListCards(r.Context(), store.CardFilter{
+	filter := store.CardFilter{
 		AppID:    queryInt64(r, "app_id"),
 		Status:   r.URL.Query().Get("status"),
 		PolicyID: queryInt64(r, "policy_id"),
 		Kami:     r.URL.Query().Get("kami"),
-		Limit:    200,
-	})
+	}
+	// 单页上限 200，分页拉全量，导出不截断
+	var cards []store.Card
+	for offset := 0; ; offset += 200 {
+		filter.Limit, filter.Offset = 200, offset
+		rows, total, err := s.st.ListCards(r.Context(), filter)
+		if err != nil {
+			internalErr(w, s.log, "导出失败", err)
+			return
+		}
+		cards = append(cards, rows...)
+		if len(rows) == 0 || int64(offset+len(rows)) >= total {
+			break
+		}
+	}
+
+	ids := make([]int64, 0, len(cards))
+	for _, c := range cards {
+		ids = append(ids, c.ID)
+	}
+	devices, err := s.st.BoundDeviceCounts(r.Context(), ids)
+	if err != nil {
+		internalErr(w, s.log, "导出失败", err)
+		return
+	}
+	online, err := s.st.OnlineDeviceCounts(r.Context(), ids, s.now().Unix())
 	if err != nil {
 		internalErr(w, s.log, "导出失败", err)
 		return
@@ -142,18 +167,23 @@ func (s *Server) exportCards(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte{0xEF, 0xBB, 0xBF}) // BOM
 
 	cw := csv.NewWriter(w)
-	_ = cw.Write([]string{"id", "kami", "kind", "status", "expire_at", "points", "remain_times", "remaining_seconds", "device_limit", "rebind_used", "policy_id", "agent_id", "note", "created_at"})
+	_ = cw.Write([]string{"id", "kami", "kind", "status", "duration_seconds", "expire_at", "points", "remain_times", "remaining_seconds", "bound_devices", "online_devices", "device_limit", "rebind_used", "policy_id", "agent_id", "note", "created_at"})
 	for _, c := range cards {
 		agentID := ""
 		if c.AgentID.Valid {
 			agentID = strconv.FormatInt(c.AgentID.Int64, 10)
 		}
+		var snap card.Snapshot
+		_ = json.Unmarshal([]byte(c.SnapshotJSON), &snap)
 		_ = cw.Write([]string{
 			strconv.FormatInt(c.ID, 10), c.Kami, c.Kind, c.Status,
+			strconv.FormatInt(snap.TotalSeconds(), 10),
 			strconv.FormatInt(c.ExpireAt, 10),
 			strconv.FormatInt(c.Points, 10),
 			strconv.FormatInt(c.RemainTimes, 10),
 			strconv.FormatInt(c.RemainingSeconds, 10),
+			strconv.FormatInt(devices[c.ID], 10),
+			strconv.FormatInt(online[c.ID], 10),
 			strconv.FormatInt(c.DeviceLimit, 10),
 			strconv.FormatInt(c.RebindUsed, 10),
 			strconv.FormatInt(c.PolicyID, 10),

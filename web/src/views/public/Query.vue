@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { NAlert, NButton, NCard, NInput, NTag } from 'naive-ui'
-import { formatTs, kindLabels, statusLabels } from '../../utils'
+import { formatExpiry, cardKindLabel, statusLabels } from '../../utils'
 
 interface QueryResult {
   status: string
   kind: string
+  duration_seconds: number
   expire_at: number
   points: number
   remain_times: number
@@ -43,7 +44,7 @@ const balance = computed(() => {
   if (r.kind === 'credit') return `${r.points} 点`
   if (r.kind === 'count') return `${r.remain_times} 次`
   if (r.kind === 'timed') return `${Math.floor(r.remaining_seconds / 60)} 分钟`
-  return '不限'
+  return '—'
 })
 
 async function query() {
@@ -110,7 +111,7 @@ async function unbind() {
 
     <main class="main">
       <h1>查询卡密状态</h1>
-      <p class="lede">输入卡密即可查看到期时间、剩余余额与已绑定设备数。</p>
+      <p class="lede">输入卡密即可查看到期时间、剩余次数/点数/时长与已绑定设备数。</p>
 
       <div class="form">
         <n-input
@@ -133,14 +134,14 @@ async function unbind() {
         </div>
         <div class="row">
           <span class="label">类型</span>
-          <span>{{ kindLabels[result.kind] ?? result.kind }}</span>
+          <span>{{ cardKindLabel(result.kind, result.duration_seconds) }}</span>
         </div>
         <div class="row">
           <span class="label">到期</span>
-          <span>{{ result.expire_at ? formatTs(result.expire_at) : '永久' }}</span>
+          <span>{{ formatExpiry(result.kind, result.expire_at, result.remaining_seconds) }}</span>
         </div>
         <div class="row">
-          <span class="label">余额</span>
+          <span class="label">剩余</span>
           <span>{{ balance }}</span>
         </div>
         <div class="row">
