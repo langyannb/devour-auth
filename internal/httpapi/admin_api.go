@@ -381,7 +381,7 @@ func cardJSON(c store.Card) map[string]any {
 	return map[string]any{
 		"id": c.ID, "app_id": c.AppID, "kami": c.Kami, "policy_id": c.PolicyID,
 		"kind": c.Kind, "status": c.Status, "batch_id": batchID, "agent_id": agentID,
-		"device_limit": c.DeviceLimit, "expire_at": c.ExpireAt,
+		"device_limit": c.DeviceLimit, "verify_device": c.VerifyDevice, "expire_at": c.ExpireAt,
 		"remain_times": c.RemainTimes, "points": c.Points,
 		"remaining_seconds": c.RemainingSeconds, "paused": c.Paused,
 		"rebind_used": c.RebindUsed, "note": c.Note,

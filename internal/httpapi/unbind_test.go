@@ -217,3 +217,30 @@ func TestPolicyKindRestricted(t *testing.T) {
 		t.Fatalf("时长卡应允许，得到 %d %s", code, body)
 	}
 }
+
+// 单卡可以单独关掉设备校验，不受全局开关影响。
+func TestCardVerifyDeviceOverride(t *testing.T) {
+	e := captchaSetup(t)
+	c, csrf := e.login(t, "admin", "8.8.7.1")
+	kami := e.quickCardLimit(t, c, csrf, "8.8.7.1", 1)
+	var id int64
+	if err := e.st.DB().QueryRow(`SELECT id FROM cards WHERE kami = ?`, kami).Scan(&id); err != nil {
+		t.Fatal(err)
+	}
+	if code, body := e.do(t, c, http.MethodPatch, fmt.Sprintf("/admin/api/cards/%d", id), csrf, "8.8.7.1",
+		`{"verify_device":false}`); code != http.StatusOK {
+		t.Fatalf("关设备校验失败: %d %s", code, body)
+	}
+	e.clientLogin(t, kami, "fp-v1", "8.8.7.1")
+	e.clientLogin(t, kami, "fp-v2", "8.8.7.1")
+
+	if code, body := e.do(t, c, http.MethodPatch, fmt.Sprintf("/admin/api/cards/%d", id), csrf, "8.8.7.1",
+		`{"verify_device":true}`); code != http.StatusOK {
+		t.Fatalf("开设备校验失败: %d %s", code, body)
+	}
+	body := fmt.Sprintf(`{"kami":%q,"device":{"fingerprint":"fp-v3"},"ts":%d,"nonce":%q}`,
+		kami, time.Now().Unix(), fmt.Sprintf("nonce-v-%d", time.Now().UnixNano()))
+	if code, _ := e.do(t, &http.Client{}, http.MethodPost, "/v1/auth/login", "", "8.8.7.1", body); code != http.StatusForbidden {
+		t.Fatalf("重新开启后第三台设备应 403，得到 %d", code)
+	}
+}

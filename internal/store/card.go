@@ -39,18 +39,19 @@ type Card struct {
 	ActivatedAt      sql.NullInt64
 	BannedAt         sql.NullInt64
 	CreatedAt        int64
+	VerifyDevice     int64 // 0 = 这张卡不校验设备上限
 }
 
 const cardCols = `id, app_id, kami, policy_id, kind, status, batch_id, agent_id,
   device_limit, expire_at, remain_times, points, remaining_seconds,
-  paused, rebind_used, rebind_at, snapshot_json, COALESCE(note,''), activated_at, banned_at, created_at`
+  paused, rebind_used, rebind_at, snapshot_json, COALESCE(note,''), activated_at, banned_at, created_at, verify_device`
 
 func scanCard(sc interface{ Scan(...any) error }) (Card, error) {
 	var c Card
 	err := sc.Scan(
 		&c.ID, &c.AppID, &c.Kami, &c.PolicyID, &c.Kind, &c.Status, &c.BatchID, &c.AgentID,
 		&c.DeviceLimit, &c.ExpireAt, &c.RemainTimes, &c.Points, &c.RemainingSeconds,
-		&c.Paused, &c.RebindUsed, &c.RebindAt, &c.SnapshotJSON, &c.Note, &c.ActivatedAt, &c.BannedAt, &c.CreatedAt,
+		&c.Paused, &c.RebindUsed, &c.RebindAt, &c.SnapshotJSON, &c.Note, &c.ActivatedAt, &c.BannedAt, &c.CreatedAt, &c.VerifyDevice,
 	)
 	return c, err
 }
@@ -64,11 +65,11 @@ func insertCard(ctx context.Context, ex Executor, c Card) (int64, error) {
 	res, err := ex.ExecContext(ctx,
 		`INSERT INTO cards(app_id, kami, policy_id, kind, status, batch_id, agent_id,
 		   device_limit, expire_at, remain_times, points, remaining_seconds,
-		   paused, rebind_used, snapshot_json, note, activated_at, banned_at, created_at)
-		 VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		   paused, rebind_used, snapshot_json, note, activated_at, banned_at, created_at, verify_device)
+		 VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		c.AppID, c.Kami, c.PolicyID, c.Kind, c.Status, c.BatchID, c.AgentID,
 		c.DeviceLimit, c.ExpireAt, c.RemainTimes, c.Points, c.RemainingSeconds,
-		c.Paused, c.RebindUsed, c.SnapshotJSON, c.Note, c.ActivatedAt, c.BannedAt, c.CreatedAt)
+		c.Paused, c.RebindUsed, c.SnapshotJSON, c.Note, c.ActivatedAt, c.BannedAt, c.CreatedAt, c.VerifyDevice)
 	if err != nil {
 		return 0, err
 	}
@@ -77,6 +78,10 @@ func insertCard(ctx context.Context, ex Executor, c Card) (int64, error) {
 
 // InsertCard 在给定事务内插入一张卡，供发卡批次使用。
 func (s *Store) InsertCard(ctx context.Context, tx *sql.Tx, c Card) (int64, error) {
+	// 新卡默认校验设备；关掉只能通过 SetVerifyDevice 单独设置
+	if c.VerifyDevice == 0 {
+		c.VerifyDevice = 1
+	}
 	return insertCard(ctx, tx, c)
 }
 
@@ -84,11 +89,11 @@ func updateCard(ctx context.Context, ex Executor, c Card) error {
 	_, err := ex.ExecContext(ctx,
 		`UPDATE cards SET status=?, device_limit=?, expire_at=?, remain_times=?, points=?,
 		   remaining_seconds=?, paused=?, rebind_used=?, rebind_at=?, snapshot_json=?,
-		   note=?, activated_at=?, banned_at=?
+		   note=?, activated_at=?, banned_at=?, verify_device=?
 		 WHERE id = ?`,
 		c.Status, c.DeviceLimit, c.ExpireAt, c.RemainTimes, c.Points,
 		c.RemainingSeconds, c.Paused, c.RebindUsed, c.RebindAt, c.SnapshotJSON,
-		c.Note, c.ActivatedAt, c.BannedAt, c.ID)
+		c.Note, c.ActivatedAt, c.BannedAt, c.VerifyDevice, c.ID)
 	return err
 }
 
