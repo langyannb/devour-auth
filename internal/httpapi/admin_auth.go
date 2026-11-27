@@ -186,6 +186,11 @@ func (s *Server) requireAdmin(next http.HandlerFunc) http.HandlerFunc {
 		ctx := r.Context()
 		cookie, err := r.Cookie(s.adminCookieName())
 		if err != nil {
+			// 交叉访问：带着代理会话打管理端一律 403（design.md 第 5 节）
+			if _, aerr := r.Cookie(s.agentCookieName()); aerr == nil {
+				writeErr(w, http.StatusForbidden, CodeUnauthorized, "代理会话不能访问管理端")
+				return
+			}
 			writeErr(w, http.StatusUnauthorized, CodeUnauthorized, "未登录")
 			return
 		}

@@ -12,7 +12,7 @@ import (
 func (s *Server) spa(w http.ResponseWriter, r *http.Request) {
 	// API 前缀未匹配到具体路由时保持 JSON 错误，不要吐 HTML。
 	if strings.HasPrefix(r.URL.Path, "/admin/api/") || strings.HasPrefix(r.URL.Path, "/v1/") ||
-		strings.HasPrefix(r.URL.Path, "/open/") {
+		strings.HasPrefix(r.URL.Path, "/agent/api/") || strings.HasPrefix(r.URL.Path, "/open/") {
 		writeErr(w, http.StatusNotFound, CodeBadInput, "接口不存在")
 		return
 	}

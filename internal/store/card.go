@@ -141,6 +141,8 @@ type CardFilter struct {
 	PolicyID int64
 	Kami     string
 	AgentID  int64
+	// AgentIDs 非空时按 IN 过滤（代理只能看自己与下级）
+	AgentIDs []int64
 	Limit    int
 	Offset   int
 }
@@ -169,6 +171,14 @@ func (f *CardFilter) where() (string, []any) {
 	if f.AgentID > 0 {
 		conds = append(conds, "agent_id = ?")
 		args = append(args, f.AgentID)
+	}
+	if len(f.AgentIDs) > 0 {
+		ph := make([]string, len(f.AgentIDs))
+		for i, id := range f.AgentIDs {
+			ph[i] = "?"
+			args = append(args, id)
+		}
+		conds = append(conds, "agent_id IN ("+strings.Join(ph, ",")+")")
 	}
 	if len(conds) == 0 {
 		return "", nil

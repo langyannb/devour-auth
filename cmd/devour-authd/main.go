@@ -37,8 +37,14 @@ func main() {
 		err = runAnchor(config.Load())
 	case "seed":
 		err = runSeed(config.Load())
+	case "bills":
+		month := ""
+		if len(os.Args) > 2 {
+			month = os.Args[2]
+		}
+		err = runBills(config.Load(), month)
 	default:
-		fmt.Fprintf(os.Stderr, "用法: %s [serve|init-admin|verify-audit|anchor|seed]\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "用法: %s [serve|init-admin|verify-audit|anchor|seed|bills [YYYY-MM]]\n", os.Args[0])
 		os.Exit(2)
 	}
 

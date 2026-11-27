@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/langyannb/devour-auth/internal/agent"
 	"github.com/langyannb/devour-auth/internal/auth"
 	"github.com/langyannb/devour-auth/internal/card"
 	"github.com/langyannb/devour-auth/internal/clientauth"
@@ -16,6 +17,7 @@ type Server struct {
 	st      *store.Store
 	cards   *card.Service
 	clients *clientauth.Service
+	agents  *agent.Service
 	static  fs.FS
 	log     *slog.Logger
 	env     string
@@ -28,6 +30,7 @@ func New(st *store.Store, log *slog.Logger, env string, static fs.FS) *Server {
 		st:      st,
 		cards:   card.New(st),
 		clients: clientauth.New(st),
+		agents:  agent.New(st),
 		static:  static,
 		log:     log,
 		env:     env,
@@ -72,6 +75,25 @@ func (s *Server) Handler() http.Handler {
 
 	// 审计
 	mux.HandleFunc("GET /admin/api/audit", s.requireAdmin(s.listAudit))
+
+	// 代理管理（管理员）
+	mux.HandleFunc("GET /admin/api/agents", s.requireAdmin(s.listAgents))
+	mux.HandleFunc("POST /admin/api/agents", s.requireAdmin(s.requireReauth(s.createAgent)))
+	mux.HandleFunc("PATCH /admin/api/agents/{id}", s.requireAdmin(s.requireReauth(s.updateAgent)))
+	mux.HandleFunc("POST /admin/api/agents/{id}/freeze", s.requireAdmin(s.setAgentFrozen(true)))
+	mux.HandleFunc("POST /admin/api/agents/{id}/unfreeze", s.requireAdmin(s.setAgentFrozen(false)))
+	mux.HandleFunc("GET /admin/api/agents/{id}/bills", s.requireAdmin(s.agentBillsAdmin))
+	mux.HandleFunc("POST /admin/api/bills/{billId}/settle", s.requireAdmin(s.settleBill))
+
+	// 代理端（独立会话域）
+	mux.HandleFunc("POST /agent/api/login", s.agentLogin)
+	mux.HandleFunc("POST /agent/api/logout", s.requireAgent(s.agentLogout))
+	mux.HandleFunc("GET /agent/api/me", s.requireAgent(s.agentMe))
+	mux.HandleFunc("GET /agent/api/policies", s.requireAgent(s.agentPolicies))
+	mux.HandleFunc("POST /agent/api/issue", s.requireAgent(s.agentIssue))
+	mux.HandleFunc("GET /agent/api/cards", s.requireAgent(s.agentCards))
+	mux.HandleFunc("GET /agent/api/ledger", s.requireAgent(s.agentLedger))
+	mux.HandleFunc("GET /agent/api/bills", s.requireAgent(s.agentBills))
 
 	// 客户端协议（design.md 第 12 节）
 	mux.HandleFunc("POST /v1/auth/login", s.clientLogin)

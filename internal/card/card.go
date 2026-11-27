@@ -137,6 +137,8 @@ type GenerateReq struct {
 	Actor     string // admin:1
 	IP        string
 	Note      string
+	// Hook 在同一事务提交前执行，用于代理记账等需要与发卡原子化的写入。
+	Hook func(ctx context.Context, tx *sql.Tx, batchID int64) error
 }
 
 type GenerateResult struct {
@@ -236,6 +238,11 @@ func (s *Service) Generate(ctx context.Context, req GenerateReq) (GenerateResult
 		IP:     req.IP,
 	}); err != nil {
 		return GenerateResult{}, err
+	}
+	if req.Hook != nil {
+		if err := req.Hook(ctx, tx, batchID); err != nil {
+			return GenerateResult{}, err
+		}
 	}
 	if err := tx.Commit(); err != nil {
 		return GenerateResult{}, err
