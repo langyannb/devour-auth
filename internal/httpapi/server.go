@@ -149,6 +149,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /admin/api/agents", s.requireAdmin(s.requireReauth(s.createAgent)))
 	mux.HandleFunc("PATCH /admin/api/agents/{id}", s.requireAdmin(s.requireReauth(s.updateAgent)))
 	mux.HandleFunc("POST /admin/api/agents/{id}/freeze", s.requireAdmin(s.setAgentFrozen(true)))
+	mux.HandleFunc("GET /admin/api/agents/{id}/prices", s.requireAdmin(s.listAgentPrices))
+	mux.HandleFunc("PUT /admin/api/agents/{id}/prices", s.requireAdmin(s.requireRole("admin", s.setAgentPrices)))
 	mux.HandleFunc("POST /admin/api/agents/{id}/unfreeze", s.requireAdmin(s.setAgentFrozen(false)))
 	mux.HandleFunc("GET /admin/api/agents/{id}/bills", s.requireAdmin(s.agentBillsAdmin))
 	mux.HandleFunc("POST /admin/api/bills/{billId}/settle", s.requireAdmin(s.settleBill))

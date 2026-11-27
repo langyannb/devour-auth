@@ -180,7 +180,8 @@ func (s *Server) agentMe(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) agentPolicies(w http.ResponseWriter, r *http.Request) {
-	apps, err := s.st.ListApps(r.Context())
+	ctx := r.Context()
+	apps, err := s.st.ListApps(ctx)
 	if err != nil || len(apps) == 0 {
 		writeData(w, []map[string]any{})
 		return
@@ -191,13 +192,23 @@ func (s *Server) agentPolicies(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	c := agentFrom(r)
+	prices, err := s.st.ListAgentPrices(ctx, c.Agent.ID)
+	if err != nil {
+		internalErr(w, s.log, "查代理价格失败", err)
+		return
+	}
 	out := make([]map[string]any, 0, len(policies))
 	for _, p := range policies {
-		if p.Active != 1 {
+		if p.Active != 1 || isInternalPolicy(p.Code) {
 			continue
 		}
 		m := policyJSON(p)
-		m["agent_price_cents"] = agent.PayableCents(p.PriceCents, c.Agent.DiscountBP, 1)
+		price := agent.PayableCents(p.PriceCents, c.Agent.DiscountBP, 1)
+		if v, ok := prices[p.ID]; ok {
+			price = v
+		}
+		m["agent_price_cents"] = price
+		m["has_custom_price"] = func() bool { _, ok := prices[p.ID]; return ok }()
 		out = append(out, m)
 	}
 	writeData(w, out)

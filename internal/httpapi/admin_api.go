@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/langyannb/devour-auth/internal/audit"
 	"github.com/langyannb/devour-auth/internal/card"
@@ -152,6 +153,11 @@ func (req policyReq) apply(p *store.Policy) {
 	}
 }
 
+// isInternalPolicy 发卡页自动维护的模板策略，不在管理界面展示。
+func isInternalPolicy(code string) bool {
+	return strings.HasPrefix(code, "_quick_")
+}
+
 func validKind(k string) bool {
 	switch k {
 	case store.KindDuration, store.KindForever, store.KindCount, store.KindCredit, store.KindTimed, store.KindTrial:
@@ -182,6 +188,9 @@ func (s *Server) listPolicies(w http.ResponseWriter, r *http.Request) {
 	}
 	out := make([]map[string]any, 0, len(policies))
 	for _, p := range policies {
+		if isInternalPolicy(p.Code) {
+			continue
+		}
 		out = append(out, policyJSON(p))
 	}
 	writeData(w, out)

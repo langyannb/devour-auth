@@ -32,6 +32,7 @@ const adminRoutes: RouteRecordRaw[] = [
       { path: 'events', component: () => import('./views/Events.vue') },
       { path: 'finance', component: () => import('./views/Finance.vue') },
       { path: 'agents', component: () => import('./views/Agents.vue') },
+      { path: 'agents/:id', component: () => import('./views/AgentDetail.vue') },
       { path: 'ops', component: () => import('./views/Ops.vue') },
       { path: 'audit', component: () => import('./views/Audit.vue') },
       { path: 'settings', component: () => import('./views/Settings.vue') },

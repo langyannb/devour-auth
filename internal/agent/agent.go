@@ -124,7 +124,14 @@ func (s *Service) Issue(ctx context.Context, req IssueReq) (IssueResult, error) 
 		return IssueResult{}, apierr.New(apierr.BadInput, "卡类型不可用")
 	}
 
-	payable := PayableCents(p.PriceCents, a.DiscountBP, req.Qty)
+	// 单价优先级：代理级价格表 > 售价 × 折扣
+	unitPrice := PayableCents(p.PriceCents, a.DiscountBP, 1)
+	if price, ok, err := s.st.AgentPriceFor(ctx, a.ID, p.ID); err != nil {
+		return IssueResult{}, err
+	} else if ok {
+		unitPrice = price
+	}
+	payable := unitPrice * int64(req.Qty)
 
 	// 额度：本月已出卡金额 + 本次应付 不得超过 monthly_quota_cents（0 = 不限）
 	if a.MonthlyQuotaCents > 0 {

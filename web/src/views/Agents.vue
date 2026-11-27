@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { h, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import {
   NAlert, NButton, NDataTable, NForm, NFormItem, NInput, NInputNumber,
   NModal, NSpace, NTag, type DataTableColumns,
@@ -19,6 +20,7 @@ interface Agent {
   created_at: number
 }
 
+const router = useRouter()
 const rows = ref<Agent[]>([])
 const err = ref('')
 const notice = ref('')
@@ -52,11 +54,12 @@ const columns: DataTableColumns<Agent> = [
   {
     title: '操作',
     key: 'op',
-    width: 130,
+    width: 190,
     render: (r) =>
       h(NSpace, { size: 4 }, {
         default: () => [
-          h(NButton, { size: 'tiny', onClick: () => openEdit(r) }, { default: () => '调价' }),
+          h(NButton, { size: 'tiny', onClick: () => router.push(`/agents/${r.id}`) }, { default: () => '价格表' }),
+          h(NButton, { size: 'tiny', onClick: () => openEdit(r) }, { default: () => '调折扣' }),
           h(NButton, {
             size: 'tiny',
             type: r.status === 'active' ? 'error' : 'success',
