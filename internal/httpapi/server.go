@@ -15,30 +15,32 @@ import (
 )
 
 type Server struct {
-	st        *store.Store
-	cards     *card.Service
-	clients   *clientauth.Service
-	agents    *agent.Service
-	static    fs.FS
-	ticketKey ed25519.PrivateKey
-	log       *slog.Logger
-	env       string
-	lim       *auth.Limiter
-	now       func() time.Time
+	st         *store.Store
+	cards      *card.Service
+	clients    *clientauth.Service
+	agents     *agent.Service
+	static     fs.FS
+	ticketKey  ed25519.PrivateKey
+	log        *slog.Logger
+	env        string
+	lim        *auth.Limiter
+	openNonces *auth.Limiter
+	now        func() time.Time
 }
 
 func New(st *store.Store, log *slog.Logger, env string, static fs.FS, ticketKey ed25519.PrivateKey) *Server {
 	return &Server{
-		st:        st,
-		cards:     card.New(st),
-		clients:   clientauth.New(st),
-		agents:    agent.New(st),
-		static:    static,
-		ticketKey: ticketKey,
-		log:       log,
-		env:       env,
-		lim:       auth.NewLimiter(),
-		now:       time.Now,
+		st:         st,
+		cards:      card.New(st),
+		clients:    clientauth.New(st),
+		agents:     agent.New(st),
+		static:     static,
+		ticketKey:  ticketKey,
+		log:        log,
+		env:        env,
+		lim:        auth.NewLimiter(),
+		openNonces: auth.NewLimiter(),
+		now:        time.Now,
 	}
 }
 
@@ -111,6 +113,20 @@ func (s *Server) Handler() http.Handler {
 	// 客户端元信息与离线票据
 	mux.HandleFunc("GET /v1/meta", s.meta)
 	mux.HandleFunc("POST /v1/offline-ticket", s.offlineTicket)
+
+	// 开放 API（HMAC 签名）
+	mux.HandleFunc("POST /open/v1/cards/generate", s.requireAPIKey("cards:write", s.openGenerate))
+	mux.HandleFunc("POST /open/v1/cards/query", s.requireAPIKey("cards:read", s.openQuery))
+	mux.HandleFunc("POST /open/v1/cards/extend", s.requireAPIKey("cards:write", s.openExtend))
+	mux.HandleFunc("POST /open/v1/cards/unbind", s.requireAPIKey("cards:write", s.openUnbind))
+	mux.HandleFunc("POST /open/v1/cards/entitlements/grant", s.requireAPIKey("cards:write", s.openGrant))
+	mux.HandleFunc("GET /open/v1/stats/online", s.requireAPIKey("stats:read", s.openOnline))
+
+	// 开放 API 密钥管理
+	mux.HandleFunc("GET /admin/api/open/keys", s.requireAdmin(s.listAPIKeys))
+	mux.HandleFunc("POST /admin/api/open/keys", s.requireAdmin(s.createAPIKey))
+	mux.HandleFunc("POST /admin/api/open/keys/{id}/disable", s.requireAdmin(s.setAPIKeyStatus(false)))
+	mux.HandleFunc("POST /admin/api/open/keys/{id}/enable", s.requireAdmin(s.setAPIKeyStatus(true)))
 
 	// 客户端协议（design.md 第 12 节）
 	mux.HandleFunc("POST /v1/auth/login", s.clientLogin)

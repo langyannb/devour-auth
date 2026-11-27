@@ -1,0 +1,137 @@
+openapi: 3.0.3
+info:
+  title: Devour Auth 开放 API
+  version: 1.0.0
+  description: |
+    供代理发货系统或第三方对接。每个请求必须带四个头：
+
+    - `X-Api-Key`：密钥 ID（创建时返回）
+    - `X-Timestamp`：Unix 秒，与服务端偏差不超过 300 秒
+    - `X-Nonce`：随机串，5 分钟内不可重复
+    - `X-Signature`：`hex(hmac_sha256(secret, method + "\n" + path + "\n" + timestamp + "\n" + nonce + "\n" + body))`
+
+    `path` 不含域名与查询串；`body` 为原始 JSON 文本，GET 时为空串。
+servers:
+  - url: https://net.namikao.com
+security: []
+paths:
+  /open/v1/cards/generate:
+    post:
+      summary: 批量发卡
+      description: 需要 `cards:write`
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [policy_id, qty]
+              properties:
+                policy_id: { type: integer }
+                qty: { type: integer, minimum: 1, maximum: 500 }
+                prefix: { type: string }
+                note: { type: string }
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  data:
+                    type: object
+                    properties:
+                      batch_id: { type: integer }
+                      qty: { type: integer }
+                      kamis:
+                        type: array
+                        items: { type: string }
+  /open/v1/cards/query:
+    post:
+      summary: 查询卡密
+      description: 需要 `cards:read`
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kami]
+              properties:
+                kami: { type: string }
+      responses:
+        '200': { description: 返回卡对象 }
+        '404': { description: CARD_NOT_FOUND }
+  /open/v1/cards/extend:
+    post:
+      summary: 续期 / 加点数 / 加次数 / 加秒数
+      description: 需要 `cards:write`
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kami]
+              properties:
+                kami: { type: string }
+                days: { type: integer }
+                times: { type: integer }
+                points: { type: integer }
+                seconds: { type: integer }
+      responses:
+        '200': { description: 成功 }
+  /open/v1/cards/unbind:
+    post:
+      summary: 清空该卡的全部设备绑定
+      description: 需要 `cards:write`
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kami]
+              properties:
+                kami: { type: string }
+      responses:
+        '200': { description: 成功 }
+  /open/v1/cards/entitlements/grant:
+    post:
+      summary: 给单卡附加权限
+      description: 需要 `cards:write`
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kami, code]
+              properties:
+                kami: { type: string }
+                code: { type: string }
+                expires_at: { type: integer, description: 0 表示跟随卡 }
+      responses:
+        '200': { description: 成功 }
+  /open/v1/stats/online:
+    get:
+      summary: 当前在线会话数
+      description: 需要 `stats:read`；body 为空串
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  data:
+                    type: object
+                    properties:
+                      online: { type: integer }
+                      server_time: { type: integer }
+components:
+  schemas: {}
