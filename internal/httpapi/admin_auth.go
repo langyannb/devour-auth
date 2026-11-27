@@ -217,8 +217,8 @@ func (s *Server) requireAdmin(next http.HandlerFunc) http.HandlerFunc {
 				return
 			}
 		}
-		// 管理端会话绑定 IP：cookie 被搬到别的网络立即失效（验收 14）。
-		if sess.IP != "" && sess.IP != clientIP(r) {
+		// 管理端会话绑定 IP 网段：cookie 被搬到别的网络立即失效（验收 14）
+		if sess.IP != "" && !sameSubnet(sess.IP, clientIP(r)) {
 			_ = s.st.RevokeAdminSession(ctx, sess.ID, now)
 			_, _ = s.st.DB().ExecContext(ctx,
 				`INSERT INTO events(ts, kind, ip, ua, code) VALUES(?,?,?,?,?)`,

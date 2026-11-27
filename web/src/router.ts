@@ -24,6 +24,7 @@ const adminRoutes: RouteRecordRaw[] = [
       { path: 'ops', component: () => import('./views/Ops.vue') },
       { path: 'audit', component: () => import('./views/Audit.vue') },
       { path: 'settings', component: () => import('./views/Settings.vue') },
+      { path: 'security', component: () => import('./views/Security.vue') },
     ],
   },
 ]

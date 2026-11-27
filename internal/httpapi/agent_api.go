@@ -59,7 +59,7 @@ func (s *Server) requireAgent(next http.HandlerFunc) http.HandlerFunc {
 				return
 			}
 		}
-		if sess.IP != "" && sess.IP != clientIP(r) {
+		if sess.IP != "" && !sameSubnet(sess.IP, clientIP(r)) {
 			_ = s.st.RevokeAgentSession(ctx, sess.ID, now)
 			writeErr(w, http.StatusUnauthorized, CodeUnauthorized, "登录 IP 已变更，请重新登录")
 			return

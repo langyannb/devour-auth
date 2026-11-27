@@ -22,6 +22,7 @@ const menu = computed<MenuOption[]>(() => [
   { label: '代理', key: '/agents' },
   { label: '运营', key: '/ops' },
   { label: '审计', key: '/audit' },
+  { label: '安全', key: '/security' },
   { label: '设置', key: '/settings' },
 ])
 

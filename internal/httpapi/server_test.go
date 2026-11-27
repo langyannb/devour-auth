@@ -167,15 +167,20 @@ func TestOperatorCannotAdminOnlyRoutes(t *testing.T) {
 	}
 }
 
-// 验收项 14：伪造会话 cookie 换 IP → 会话失效。
+// 验收项 14：伪造会话 cookie 换网络 → 会话失效；同网段 NAT 轮换不踢人。
 func TestAdminSessionBoundToIP(t *testing.T) {
 	e := setup(t)
 	c, _ := e.login(t, "admin", "1.1.1.1")
 	if code, _ := e.do(t, c, http.MethodGet, "/admin/api/me", "", "1.1.1.1", ""); code != http.StatusOK {
 		t.Fatalf("同 IP 应 200，得到 %d", code)
 	}
+	// 同 /24 内换 IP 不该踢
+	if code, _ := e.do(t, c, http.MethodGet, "/admin/api/me", "", "1.1.1.99", ""); code != http.StatusOK {
+		t.Fatalf("同网段应仍可用，得到 %d", code)
+	}
+	// 跨网段视为伪造
 	if code, _ := e.do(t, c, http.MethodGet, "/admin/api/me", "", "9.9.9.9", ""); code != http.StatusUnauthorized {
-		t.Fatalf("换 IP 应 401，得到 %d", code)
+		t.Fatalf("跨网段应 401，得到 %d", code)
 	}
 	// 换回去也应失效（会话已吊销）
 	if code, _ := e.do(t, c, http.MethodGet, "/admin/api/me", "", "1.1.1.1", ""); code != http.StatusUnauthorized {

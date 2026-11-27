@@ -22,6 +22,8 @@ type Options struct {
 	AdminHost string
 	AgentHost string
 	NetHost   string
+	BackupDir string
+	DBPath    string
 }
 
 type Server struct {
@@ -36,6 +38,8 @@ type Server struct {
 	adminHost  string
 	agentHost  string
 	netHost    string
+	backupDir  string
+	dbPath     string
 	lim        *auth.Limiter
 	openNonces *auth.Limiter
 	now        func() time.Time
@@ -54,6 +58,8 @@ func New(st *store.Store, log *slog.Logger, opt Options) *Server {
 		adminHost:  opt.AdminHost,
 		agentHost:  opt.AgentHost,
 		netHost:    opt.NetHost,
+		backupDir:  opt.BackupDir,
+		dbPath:     opt.DBPath,
 		lim:        auth.NewLimiter(),
 		openNonces: auth.NewLimiter(),
 		now:        time.Now,
@@ -99,6 +105,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /admin/api/audit/verify", s.requireAdmin(s.verifyAuditChain))
 	mux.HandleFunc("GET /admin/api/stats", s.requireAdmin(s.adminStats))
 	mux.HandleFunc("GET /admin/api/stats/trend", s.requireAdmin(s.statsTrend))
+	mux.HandleFunc("GET /admin/api/health-check", s.requireAdmin(s.healthCheck))
 
 	// 代理管理（管理员）
 	mux.HandleFunc("GET /admin/api/agents", s.requireAdmin(s.listAgents))

@@ -108,6 +108,8 @@ func run() error {
 			AdminHost: cfg.AdminHost,
 			AgentHost: cfg.AgentHost,
 			NetHost:   cfg.NetHost,
+			BackupDir: cfg.BackupDir,
+			DBPath:    cfg.DBPath,
 		}).Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
 		IdleTimeout:       60 * time.Second,
