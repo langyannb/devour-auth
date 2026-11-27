@@ -267,6 +267,9 @@ func (s *Service) Login(ctx context.Context, req LoginReq, ip, ua string) (Sessi
 func (s *Service) bindDevice(ctx context.Context, tx *sql.Tx, row *store.Card, snap card.Snapshot, req LoginReq, now int64) (int64, error) {
 	dev, err := s.st.BoundDeviceTx(ctx, tx, row.ID, req.Fingerprint)
 	if err == nil {
+		if dev.Banned == 1 {
+			return 0, apierr.New(apierr.DeviceMismatch, "该设备已被封禁")
+		}
 		if err := s.st.TouchDeviceTx(ctx, tx, dev.ID, now); err != nil {
 			return 0, err
 		}

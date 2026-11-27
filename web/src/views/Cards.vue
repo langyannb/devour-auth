@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, h, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import {
   NAlert, NButton, NDataTable, NInput, NPagination, NSpace, NTag,
   type DataTableColumns,
@@ -20,6 +21,7 @@ interface Card {
   created_at: number
 }
 
+const router = useRouter()
 const rows = ref<Card[]>([])
 const total = ref(0)
 const page = ref(1)
@@ -108,7 +110,15 @@ onMounted(load)
 
     <n-alert v-if="err" type="error" style="margin-bottom: 12px">{{ err }}</n-alert>
 
-    <n-data-table :columns="columns" :data="rows" :loading="loading" :bordered="false" size="small" :scroll-x="900" />
+    <n-data-table
+      :columns="columns"
+      :data="rows"
+      :loading="loading"
+      :bordered="false"
+      size="small"
+      :scroll-x="900"
+      :row-props="(row: Card) => ({ style: 'cursor: pointer', onClick: () => router.push(`/cards/${row.id}`) })"
+    />
 
     <n-space justify="end" style="margin-top: 16px">
       <n-pagination

@@ -18,6 +18,8 @@ const menu = computed<MenuOption[]>(() => [
   { label: '概览', key: '/dashboard' },
   { label: '卡密', key: '/cards' },
   { label: '发卡', key: '/issue' },
+  { label: '设备', key: '/devices' },
+  { label: '在线', key: '/sessions' },
   { label: '卡类型', key: '/policies' },
   { label: '代理', key: '/agents' },
   { label: '运营', key: '/ops' },

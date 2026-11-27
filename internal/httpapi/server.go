@@ -107,6 +107,16 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /admin/api/stats/trend", s.requireAdmin(s.statsTrend))
 	mux.HandleFunc("GET /admin/api/health-check", s.requireAdmin(s.healthCheck))
 
+	// 设备与在线会话
+	mux.HandleFunc("GET /admin/api/devices", s.requireAdmin(s.listDevices))
+	mux.HandleFunc("POST /admin/api/devices/{id}/unbind", s.requireAdmin(s.deviceAction("unbind")))
+	mux.HandleFunc("POST /admin/api/devices/{id}/ban", s.requireAdmin(s.deviceAction("ban")))
+	mux.HandleFunc("POST /admin/api/devices/{id}/unban", s.requireAdmin(s.deviceAction("unban")))
+	mux.HandleFunc("GET /admin/api/sessions", s.requireAdmin(s.listSessions))
+	mux.HandleFunc("POST /admin/api/sessions/{id}/revoke", s.requireAdmin(s.revokeSession))
+	mux.HandleFunc("GET /admin/api/cards/{id}/devices", s.requireAdmin(s.listCardDevices))
+	mux.HandleFunc("GET /admin/api/cards/{id}/sessions", s.requireAdmin(s.listCardSessions))
+
 	// 代理管理（管理员）
 	mux.HandleFunc("GET /admin/api/agents", s.requireAdmin(s.listAgents))
 	mux.HandleFunc("POST /admin/api/agents", s.requireAdmin(s.requireReauth(s.createAgent)))
