@@ -3,6 +3,7 @@ package httpapi
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/langyannb/devour-auth/internal/store"
 )
@@ -27,6 +28,9 @@ func (s *Server) listPlans(w http.ResponseWriter, r *http.Request) {
 	}
 	out := make([]map[string]any, 0, len(list))
 	for _, p := range list {
+		if strings.HasPrefix(p.Name, "sub_") { // 代理自己给下级定的价，不在管理端展示
+			continue
+		}
 		out = append(out, planJSON(p))
 	}
 	writeData(w, out)

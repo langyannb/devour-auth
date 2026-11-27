@@ -27,7 +27,7 @@ func (s *Server) agentInviteLink(slug string) string {
 	if s.agentHost == "" {
 		return "/" + slug
 	}
-	return "https://" + s.agentHost + "/" + slug
+	return "https://" + s.agentHost + "/xj/" + slug
 }
 
 // agentInviteInfo 专属链接打开时读下级信息（免登录，凭 slug）。

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/langyannb/devour-auth/internal/audit"
 	"github.com/langyannb/devour-auth/internal/auth"
@@ -57,6 +58,9 @@ func (s *Server) agentPlans(w http.ResponseWriter, r *http.Request) {
 		if p.Active != 1 {
 			continue
 		}
+		if strings.HasPrefix(p.Name, "sub_") { // 别的下级专属模板
+			continue
+		}
 		items := make([]map[string]any, 0, len(p.Items))
 		for _, k := range planKinds {
 			if price, ok := p.Items[k]; ok && price > 0 {
@@ -91,7 +95,8 @@ func (s *Server) agentSubPlan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
-		PlanID int64 `json:"plan_id"`
+		PlanID int64            `json:"plan_id"`
+		Items  map[string]int64 `json:"items"` // 自定义价格（分），优先于 plan_id
 	}
 	if !decode(w, r, &req) {
 		return
@@ -111,10 +116,42 @@ func (s *Server) agentSubPlan(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, CodeBadInput, "上级模板不存在")
 		return
 	}
-	childPlan, err := s.st.AgentPlanByID(ctx, req.PlanID)
-	if err != nil || childPlan.AppID != parent.AppID || childPlan.Active != 1 {
-		writeErr(w, http.StatusBadRequest, CodeBadInput, "模板不存在")
-		return
+	var childPlan store.AgentPlan
+	if len(req.Items) > 0 {
+		items := map[string]int64{}
+		for _, kind := range planKinds {
+			if price := req.Items[kind]; price > 0 {
+				items[kind] = price
+			}
+		}
+		if len(items) == 0 {
+			writeErr(w, http.StatusBadRequest, CodeBadInput, "至少要设置一种卡的价格")
+			return
+		}
+		name := fmt.Sprintf("sub_%d", sub.ID)
+		id := int64(0)
+		if old, err := s.st.AgentPlanByName(ctx, parent.AppID, name); err == nil {
+			id = old.ID
+		}
+		pid, err := s.st.SaveAgentPlan(ctx, store.AgentPlan{
+			ID: id, AppID: parent.AppID, Name: name, Active: 1, Items: items,
+		}, s.now().Unix())
+		if err != nil {
+			internalErr(w, s.log, "保存下级模板失败", err)
+			return
+		}
+		childPlan, err = s.st.AgentPlanByID(ctx, pid)
+		if err != nil {
+			internalErr(w, s.log, "读下级模板失败", err)
+			return
+		}
+	} else {
+		var err error
+		childPlan, err = s.st.AgentPlanByID(ctx, req.PlanID)
+		if err != nil || childPlan.AppID != parent.AppID || childPlan.Active != 1 {
+			writeErr(w, http.StatusBadRequest, CodeBadInput, "模板不存在")
+			return
+		}
 	}
 	for _, kind := range planKinds {
 		childPrice, hasChild := childPlan.Items[kind]

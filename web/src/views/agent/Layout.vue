@@ -51,12 +51,17 @@ const active = computed(() => router.currentRoute.value.path)
       <n-menu :options="menu" :value="active" @update:value="onMenu" />
     </n-layout-sider>
     <n-layout>
-      <n-layout-header bordered style="height: 52px; display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 0 20px">
-        <span style="color: #666">{{ who }}</span>
-        <n-button size="small" @click="logout">退出</n-button>
+      <n-layout-header bordered style="height: 52px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 20px">
+        <span style="font-weight: 600; color: #0b6b4f">代理端</span>
+        <span style="display:flex;align-items:center;gap:12px">
+          <span style="color: #667085">{{ who }}</span>
+          <n-button size="small" @click="logout">退出</n-button>
+        </span>
       </n-layout-header>
       <n-layout-content content-style="padding: 20px">
-        <router-view />
+        <div style="max-width: 980px; margin: 0 auto">
+          <router-view />
+        </div>
       </n-layout-content>
     </n-layout>
   </n-layout>
@@ -66,10 +71,13 @@ const active = computed(() => router.currentRoute.value.path)
       <n-button text style="font-size: 20px; line-height: 1" @click="drawer = true">☰</n-button>
       <span style="font-weight: 600; color: #0b6b4f">代理端</span>
       <span style="flex: 1"></span>
+      <span style="font-size: 12px; color: #667085">{{ who }}</span>
       <n-button text size="small" @click="logout">退出</n-button>
     </header>
     <main style="flex: 1; padding: 12px; overflow-x: auto">
-      <router-view />
+      <div style="max-width: 980px; margin: 0 auto">
+        <router-view />
+      </div>
     </main>
   </div>
 </template>

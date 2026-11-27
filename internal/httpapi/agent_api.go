@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/langyannb/devour-auth/internal/agent"
@@ -382,7 +383,11 @@ func (s *Server) agentSubagents(w http.ResponseWriter, r *http.Request) {
 			m["plan_id"] = planID
 			if planID > 0 {
 				if p, err := s.st.AgentPlanByID(ctx, planID); err == nil {
-					m["plan_name"] = p.Name
+					if strings.HasPrefix(p.Name, "sub_") {
+						m["plan_name"] = "自定义"
+					} else {
+						m["plan_name"] = p.Name
+					}
 				}
 			}
 		}

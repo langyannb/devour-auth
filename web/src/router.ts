@@ -46,7 +46,8 @@ const adminRoutes: RouteRecordRaw[] = [
 const agentRoutes: RouteRecordRaw[] = [
   { path: '/login', component: () => import('./views/agent/Login.vue') },
   // 下级代理专属链接：agent.域名/<slug>
-  { path: '/:code', name: 'agent-invite', component: () => import('./views/agent/Invite.vue') },
+  { path: '/xj/:code', name: 'agent-invite', component: () => import('./views/agent/Invite.vue') },
+  { path: '/:code', redirect: (to) => `/xj/${to.params.code}` },
   {
     path: '/',
     component: () => import('./views/agent/Layout.vue'),
