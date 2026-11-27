@@ -166,3 +166,23 @@ func boolInt64(b bool) int64 {
 	}
 	return 0
 }
+
+// AgentPlanByName 按名称找本应用模板。
+func (s *Store) AgentPlanByName(ctx context.Context, appID int64, name string) (AgentPlan, error) {
+	var p AgentPlan
+	err := s.db.QueryRowContext(ctx,
+		`SELECT id, app_id, name, active, created_at FROM agent_plans WHERE app_id = ? AND name = ?`,
+		appID, name).Scan(&p.ID, &p.AppID, &p.Name, &p.Active, &p.CreatedAt)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return AgentPlan{}, ErrNotFound
+		}
+		return AgentPlan{}, err
+	}
+	items, err := s.planItems(ctx, p.ID)
+	if err != nil {
+		return AgentPlan{}, err
+	}
+	p.Items = items
+	return p, nil
+}

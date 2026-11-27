@@ -201,3 +201,55 @@ func TestSubAgentEnsureLink(t *testing.T) {
 		t.Fatalf("应返回同一个链接: %s", body2)
 	}
 }
+
+// 代理可以直接给下级定自己的价格（不用管理员先建模板），但不能低于自己的成本。
+func TestAgentSetsCustomSubPrices(t *testing.T) {
+	e := setup(t)
+	c, csrf := e.login(t, "admin", "5.4.1.1")
+	mk := func(name string, day int64) int64 {
+		if code, body := e.do(t, c, http.MethodPost, "/admin/api/plans?app_id=1", csrf, "5.4.1.1",
+			fmt.Sprintf(`{"name":%q,"items":{"day":%d}}`, name, day)); code != http.StatusOK {
+			t.Fatalf("建模板失败: %d %s", code, body)
+		}
+		var id int64
+		_ = e.st.DB().QueryRow(`SELECT id FROM agent_plans WHERE name=?`, name).Scan(&id)
+		return id
+	}
+	base := mk("base-cost", 300)
+	if code, body := e.do(t, c, http.MethodPost, "/admin/api/agents?app_id=1", csrf, "5.4.1.1",
+		`{"name":"cp-top","password":"agent-pass-123456","monthly_quota_cents":1000}`); code != http.StatusOK {
+		t.Fatalf("建代理失败: %d %s", code, body)
+	}
+	var topID int64
+	_ = e.st.DB().QueryRow(`SELECT id FROM agents WHERE name='cp-top'`).Scan(&topID)
+	if code, body := e.do(t, c, http.MethodPut, fmt.Sprintf("/admin/api/agents/%d/plan?app_id=1", topID), csrf, "5.4.1.1",
+		fmt.Sprintf(`{"plan_id":%d,"max_qty":10}`, base)); code != http.StatusOK {
+		t.Fatalf("绑模板失败: %d %s", code, body)
+	}
+	ac, acsrf := e.loginAgentWithPassword(t, "cp-top", "agent-pass-123456")
+	if code, body := e.do(t, ac, http.MethodPost, "/agent/api/subagents", acsrf, "", `{"name":"cp-sub"}`); code != http.StatusOK {
+		t.Fatalf("建下级失败: %d %s", code, body)
+	}
+	var subID int64
+	_ = e.st.DB().QueryRow(`SELECT id FROM agents WHERE name='cp-sub'`).Scan(&subID)
+
+	// 低于成本：拒绝
+	code, body := e.do(t, ac, http.MethodPut, fmt.Sprintf("/agent/api/subagents/%d/plan", subID), acsrf, "",
+		`{"items":{"day":200}}`)
+	if code != http.StatusBadRequest || !strings.Contains(body, "不能低于你的成本") {
+		t.Fatalf("低价应拒绝: %d %s", code, body)
+	}
+	// 高于成本：成功并落到 sub_<id> 模板
+	code, body = e.do(t, ac, http.MethodPut, fmt.Sprintf("/agent/api/subagents/%d/plan", subID), acsrf, "",
+		`{"items":{"day":500}}`)
+	if code != http.StatusOK {
+		t.Fatalf("自定义定价失败: %d %s", code, body)
+	}
+	var planName string
+	var planID int64
+	_ = e.st.DB().QueryRow(`SELECT plan_id FROM agents WHERE id=?`, subID).Scan(&planID)
+	_ = e.st.DB().QueryRow(`SELECT name FROM agent_plans WHERE id=?`, planID).Scan(&planName)
+	if planName != fmt.Sprintf("sub_%d", subID) {
+		t.Fatalf("模板名 = %s", planName)
+	}
+}

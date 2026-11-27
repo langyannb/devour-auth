@@ -47,6 +47,8 @@ const linkDlg = ref<{ name: string; link: string } | null>(null)
 const quotaYuan = ref(100)
 const planDlg = ref<Sub | null>(null)
 const planValue = ref<number | null>(null)
+const planMode = ref<'pick' | 'custom'>('pick')
+const customPrices = ref<{ day: number | null; week: number | null; month: number | null; forever: number | null }>({ day: null, week: null, month: null, forever: null })
 const permDlg = ref<Sub | null>(null)
 const permForm = ref<Perms>({ SetDeviceLimit: false, CustomKami: false, MaxQty: 10 })
 
@@ -186,14 +188,31 @@ async function submitQuota() {
 function openPlan(r: Sub) {
   planDlg.value = r
   planValue.value = r.plan_id ?? null
+  planMode.value = 'pick'
+  customPrices.value = { day: null, week: null, month: null, forever: null }
 }
 
 async function submitPlan() {
-  if (!planDlg.value || !planValue.value) return
+  if (!planDlg.value) return
+  let body: Record<string, unknown>
+  if (planMode.value === 'custom') {
+    const items: Record<string, number> = {}
+    for (const [k, v] of Object.entries(customPrices.value)) {
+      if (v && v > 0) items[k] = Math.round(v * 100)
+    }
+    if (Object.keys(items).length === 0) {
+      err.value = '至少填一种卡的价格'
+      return
+    }
+    body = { items }
+  } else {
+    if (!planValue.value) return
+    body = { plan_id: planValue.value }
+  }
   busy.value = true
   err.value = ''
   try {
-    await agentApi.put(`/agent/api/subagents/${planDlg.value.id}/plan`, { plan_id: planValue.value })
+    await agentApi.put(`/agent/api/subagents/${planDlg.value.id}/plan`, body)
     notice.value = '模板已设置，下级出卡按新价格执行'
     planDlg.value = null
     await load()
@@ -252,17 +271,20 @@ onMounted(load)
 </script>
 
 <template>
-  <div>
-    <n-space style="margin-bottom: 12px" justify="space-between">
-      <span style="font-size: 13px; color: #666">你自己和下级代理；下级只能由一级代理开通。</span>
-      <n-button type="primary" size="small" @click="showCreate = true">开通下级</n-button>
-    </n-space>
+  <div class="page">
+    <div class="page-head">
+      <div>
+        <h2>下级代理</h2>
+        <p>一级代理可以开通下级；模板、额度、权限都在这里设置。</p>
+      </div>
+      <n-button type="primary" @click="showCreate = true">+ 开通下级</n-button>
+    </div>
 
     <n-alert v-if="err" type="error" style="margin-bottom: 12px">{{ err }}</n-alert>
     <n-alert v-if="notice" type="success" style="margin-bottom: 12px">{{ notice }}</n-alert>
 
     <template v-if="isMobile">
-      <n-card v-for="r in rows" :key="r.id" size="small" style="margin-bottom: 10px">
+      <div v-for="r in rows" :key="r.id" class="sub-card">
         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
           <b>{{ r.name }}</b>
           <n-tag v-if="r.is_self" size="tiny" type="info">我</n-tag>
@@ -285,8 +307,18 @@ onMounted(load)
             {{ r.status === 'active' ? '冻结' : '解冻' }}
           </n-button>
         </n-space>
-      </n-card>
+      </div>
     </template>
+
+<style scoped>
+.page { max-width: 880px; margin: 0 auto; }
+.page-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.page-head h2 { margin: 0 0 4px; font-size: 18px; }
+.page-head p { margin: 0; font-size: 12px; color: #8b93a7; }
+.sub-card { background: #fff; border: 1px solid #e6ebe8; border-radius: 10px; padding: 14px 14px 10px; margin-bottom: 10px; box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04); }
+.price-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px; }
+.price-grid label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #667085; }
+</style>
     <n-data-table v-else :columns="columns" :data="rows" :loading="loading" :bordered="false" size="small" :scroll-x="720" />
 
     <n-modal v-model:show="showCreate" preset="card" title="开通下级" style="width: 420px">
@@ -312,6 +344,16 @@ onMounted(load)
         <a :href="linkDlg.link" target="_blank" rel="noopener" style="word-break: break-all">{{ linkDlg.link }}</a>
         <n-input :value="linkDlg.link" readonly style="margin-top: 8px" />
       </template>
+
+<style scoped>
+.page { max-width: 880px; margin: 0 auto; }
+.page-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.page-head h2 { margin: 0 0 4px; font-size: 18px; }
+.page-head p { margin: 0; font-size: 12px; color: #8b93a7; }
+.sub-card { background: #fff; border: 1px solid #e6ebe8; border-radius: 10px; padding: 14px 14px 10px; margin-bottom: 10px; box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04); }
+.price-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px; }
+.price-grid label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #667085; }
+</style>
       <n-space justify="end" style="margin-top: 16px">
         <n-button @click="linkDlg = null">关闭</n-button>
         <n-button type="primary" @click="copyLink">复制链接</n-button>
@@ -325,8 +367,28 @@ onMounted(load)
         </p>
         <n-input-number v-model:value="quotaYuan" :min="1" :precision="0" style="width: 100%">
           <template #suffix>元</template>
+
+<style scoped>
+.page { max-width: 880px; margin: 0 auto; }
+.page-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.page-head h2 { margin: 0 0 4px; font-size: 18px; }
+.page-head p { margin: 0; font-size: 12px; color: #8b93a7; }
+.sub-card { background: #fff; border: 1px solid #e6ebe8; border-radius: 10px; padding: 14px 14px 10px; margin-bottom: 10px; box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04); }
+.price-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px; }
+.price-grid label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #667085; }
+</style>
         </n-input-number>
       </template>
+
+<style scoped>
+.page { max-width: 880px; margin: 0 auto; }
+.page-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.page-head h2 { margin: 0 0 4px; font-size: 18px; }
+.page-head p { margin: 0; font-size: 12px; color: #8b93a7; }
+.sub-card { background: #fff; border: 1px solid #e6ebe8; border-radius: 10px; padding: 14px 14px 10px; margin-bottom: 10px; box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04); }
+.price-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px; }
+.price-grid label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #667085; }
+</style>
       <n-space justify="end" style="margin-top: 16px">
         <n-button @click="quotaDlg = null">取消</n-button>
         <n-button type="primary" :loading="busy" @click="submitQuota">划转</n-button>
@@ -338,19 +400,66 @@ onMounted(load)
         <p style="margin-top: 0; font-size: 13px; color: #666">
           每一档价格都不能低于你自己的模板；下级只能看到模板里有的卡类型。
         </p>
-        <n-select
-          v-model:value="planValue"
-          :options="plans.map((p) => ({ label: p.name, value: p.id }))"
-          placeholder="选择模板"
-        />
-        <div v-if="planValue" style="margin-top: 12px; font-size: 13px; color: #4a5568">
-          <div v-for="p in plans.filter((x) => x.id === planValue)" :key="p.id">
-            <span v-for="i in p.items" :key="i.kind" style="margin-right: 14px">
-              {{ i.name }} {{ formatYuan(i.price_cents) }} 元
-            </span>
-          </div>
+        <div style="display:flex;gap:8px;margin-bottom:12px">
+          <n-button size="small" :type="planMode === 'pick' ? 'primary' : 'default'" @click="planMode = 'pick'">用现成模板</n-button>
+          <n-button size="small" :type="planMode === 'custom' ? 'primary' : 'default'" @click="planMode = 'custom'">自己定价</n-button>
         </div>
+
+        <template v-if="planMode === 'pick'">
+          <n-select
+            v-model:value="planValue"
+            :options="plans.map((p) => ({ label: p.name, value: p.id }))"
+            placeholder="选择模板"
+          />
+          <div v-if="planValue" style="margin-top: 12px; font-size: 13px; color: #4a5568">
+            <div v-for="p in plans.filter((x) => x.id === planValue)" :key="p.id">
+              <span v-for="i in p.items" :key="i.kind" style="margin-right: 14px">
+                {{ i.name }} {{ formatYuan(i.price_cents) }} 元
+              </span>
+            </div>
+          </div>
+        </template>
+
+<style scoped>
+.page { max-width: 880px; margin: 0 auto; }
+.page-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.page-head h2 { margin: 0 0 4px; font-size: 18px; }
+.page-head p { margin: 0; font-size: 12px; color: #8b93a7; }
+.sub-card { background: #fff; border: 1px solid #e6ebe8; border-radius: 10px; padding: 14px 14px 10px; margin-bottom: 10px; box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04); }
+.price-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px; }
+.price-grid label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #667085; }
+</style>
+
+        <template v-else>
+          <p style="margin:0 0 10px;font-size:12px;color:#8b93a7">单位：元；留空表示不开放这一档。每一档不能低于你的成本价。</p>
+          <div class="price-grid">
+            <label>天卡 <n-input-number v-model:value="customPrices.day" :min="0" :precision="2" placeholder="0" /></label>
+            <label>周卡 <n-input-number v-model:value="customPrices.week" :min="0" :precision="2" placeholder="0" /></label>
+            <label>月卡 <n-input-number v-model:value="customPrices.month" :min="0" :precision="2" placeholder="0" /></label>
+            <label>永久卡 <n-input-number v-model:value="customPrices.forever" :min="0" :precision="2" placeholder="0" /></label>
+          </div>
+        </template>
+
+<style scoped>
+.page { max-width: 880px; margin: 0 auto; }
+.page-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.page-head h2 { margin: 0 0 4px; font-size: 18px; }
+.page-head p { margin: 0; font-size: 12px; color: #8b93a7; }
+.sub-card { background: #fff; border: 1px solid #e6ebe8; border-radius: 10px; padding: 14px 14px 10px; margin-bottom: 10px; box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04); }
+.price-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px; }
+.price-grid label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #667085; }
+</style>
       </template>
+
+<style scoped>
+.page { max-width: 880px; margin: 0 auto; }
+.page-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.page-head h2 { margin: 0 0 4px; font-size: 18px; }
+.page-head p { margin: 0; font-size: 12px; color: #8b93a7; }
+.sub-card { background: #fff; border: 1px solid #e6ebe8; border-radius: 10px; padding: 14px 14px 10px; margin-bottom: 10px; box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04); }
+.price-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px; }
+.price-grid label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #667085; }
+</style>
       <n-space justify="end" style="margin-top: 16px">
         <n-button @click="planDlg = null">取消</n-button>
         <n-button type="primary" :loading="busy" @click="submitPlan">保存</n-button>
@@ -377,3 +486,13 @@ onMounted(load)
     </n-modal>
   </div>
 </template>
+
+<style scoped>
+.page { max-width: 880px; margin: 0 auto; }
+.page-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.page-head h2 { margin: 0 0 4px; font-size: 18px; }
+.page-head p { margin: 0; font-size: 12px; color: #8b93a7; }
+.sub-card { background: #fff; border: 1px solid #e6ebe8; border-radius: 10px; padding: 14px 14px 10px; margin-bottom: 10px; box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04); }
+.price-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px; }
+.price-grid label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #667085; }
+</style>
