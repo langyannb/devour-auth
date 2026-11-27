@@ -46,7 +46,7 @@ const adminRoutes: RouteRecordRaw[] = [
 const agentRoutes: RouteRecordRaw[] = [
   { path: '/login', component: () => import('./views/agent/Login.vue') },
   // 下级代理专属链接：agent.域名/<slug>
-  { path: '/:code', component: () => import('./views/agent/Invite.vue') },
+  { path: '/:code', name: 'agent-invite', component: () => import('./views/agent/Invite.vue') },
   {
     path: '/',
     component: () => import('./views/agent/Layout.vue'),
@@ -83,7 +83,7 @@ router.beforeEach(async (to) => {
   if (!isAgent && !isAdmin) return true // 官网与查卡页免登录
 
   if (isAgent) {
-    if (to.path === '/login') return true
+    if (to.path === '/login' || to.name === 'agent-invite') return true
     if (agentAuthed.value) return true
     return (await tryRestoreAgent()) ? true : '/login'
   }

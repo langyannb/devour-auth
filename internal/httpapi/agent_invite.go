@@ -108,6 +108,8 @@ func (s *Server) agentInviteActivate(w http.ResponseWriter, r *http.Request) {
 		"id":          res.Agent.ID,
 		"name":        res.Agent.Name,
 		"level":       res.Agent.Level,
+		"discount_bp": res.Agent.DiscountBP,
+		"rebate_bp":   res.Agent.RebateBP,
 		"server_time": s.now().Unix(),
 	})
 }

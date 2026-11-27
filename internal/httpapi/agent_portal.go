@@ -35,6 +35,8 @@ func (s *Server) agentSummary(w http.ResponseWriter, r *http.Request) {
 	writeData(w, map[string]any{
 		"name":             c.Agent.Name,
 		"level":            c.Agent.Level,
+		"discount_bp":      c.Agent.DiscountBP,
+		"rebate_bp":        c.Agent.RebateBP,
 		"quota_cents":      c.Agent.QuotaCents,
 		"month_used_cents": used,
 		"month_remaining":  c.Agent.QuotaCents,
