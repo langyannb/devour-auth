@@ -326,6 +326,12 @@ func (s *Service) bindDevice(ctx context.Context, tx *sql.Tx, row *store.Card, s
 	if enforceLimit && n >= snap.DeviceLimit {
 		return 0, apierr.New(apierr.DeviceLimit, "设备数量已达上限（%d）", snap.DeviceLimit)
 	}
+	// 之前解绑过的同一台设备：复用原来那行，别去撞唯一约束。
+	if id, err := s.st.RebindDeviceTx(ctx, tx, row.ID, req.Fingerprint, now); err == nil {
+		return id, nil
+	} else if !errors.Is(err, store.ErrNotFound) {
+		return 0, err
+	}
 	return s.st.InsertDeviceTx(ctx, tx, store.Device{
 		CardID: row.ID, Fingerprint: req.Fingerprint,
 		Model: req.Model, Brand: req.Brand, OS: req.OS, AppVersion: req.AppVersion,

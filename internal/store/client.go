@@ -51,6 +51,28 @@ func (s *Store) CountBoundDevicesTx(ctx context.Context, tx *sql.Tx, cardID int6
 	return n, err
 }
 
+// RebindDeviceTx 重新启用之前解绑过的同一台设备：设备行不重复插入
+// （devices 上有 (card_id, fingerprint) 唯一约束），只清掉 unbound_at。
+func (s *Store) RebindDeviceTx(ctx context.Context, tx *sql.Tx, cardID int64, fingerprint string, now int64) (int64, error) {
+	res, err := tx.ExecContext(ctx,
+		`UPDATE devices SET unbound_at = NULL, last_seen = ?
+		  WHERE card_id = ? AND fingerprint = ? AND unbound_at IS NOT NULL`,
+		now, cardID, fingerprint)
+	if err != nil {
+		return 0, err
+	}
+	if n, err := res.RowsAffected(); err != nil {
+		return 0, err
+	} else if n == 0 {
+		return 0, ErrNotFound
+	}
+	var id int64
+	err = tx.QueryRowContext(ctx,
+		`SELECT id FROM devices WHERE card_id = ? AND fingerprint = ?`,
+		cardID, fingerprint).Scan(&id)
+	return id, err
+}
+
 func (s *Store) InsertDeviceTx(ctx context.Context, tx *sql.Tx, d Device) (int64, error) {
 	res, err := tx.ExecContext(ctx,
 		`INSERT INTO devices(card_id, fingerprint, model, brand, os, app_version, first_seen, last_seen, banned)

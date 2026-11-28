@@ -367,6 +367,32 @@ func TestBannedCardRejected(t *testing.T) {
 	}
 }
 
+func TestRebindAfterUnbind(t *testing.T) {
+	h := setup(t)
+	p := h.makePolicy(t, store.Policy{Code: "c", Name: "c", Kind: store.KindForever, DeviceLimit: 1})
+	kami := h.issue(t, p.ID)
+	if _, err := h.login(kami, "fp-1"); err != nil {
+		t.Fatal(err)
+	}
+	c, _ := h.st.CardByKami(context.Background(), kami)
+	if err := h.cards.Unbind(context.Background(), c.ID, card.StatusChange{Actor: "admin:1"}); err != nil {
+		t.Fatal(err)
+	}
+	// 解绑后同一台设备重登：要复用原来的设备行，不能撞唯一约束。
+	if _, err := h.login(kami, "fp-1"); err != nil {
+		t.Fatalf("解绑后重登失败: %v", err)
+	}
+	var bound int
+	if err := h.st.DB().QueryRow(
+		`SELECT COUNT(*) FROM devices WHERE card_id = ? AND unbound_at IS NULL`,
+		c.ID).Scan(&bound); err != nil {
+		t.Fatal(err)
+	}
+	if bound != 1 {
+		t.Fatalf("绑定数 = %d want 1", bound)
+	}
+}
+
 func TestRecycledCardRejected(t *testing.T) {
 	h := setup(t)
 	p := h.makePolicy(t, store.Policy{Code: "c", Name: "c", Kind: store.KindForever})
