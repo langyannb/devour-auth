@@ -531,6 +531,7 @@ const CPP = String.raw`// devour_client.cpp —— Android NDK 卡密客户端�
 #include <atomic>
 #include <chrono>
 #include <cstdio>
+#include <ctime>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -926,6 +927,16 @@ State Snapshot() {
 
 }  // namespace client
 }  // namespace devour
+
+// 库加载时把 JavaVM 交给客户端：已有 JNI_OnLoad 的话，在里面补一句
+// devour::client::g_vm = vm; 即可，不要重复定义。
+extern "C" JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void*) {
+  devour::client::g_vm = vm;
+  return JNI_VERSION_1_6;
+}
+
+// 下面两个 JNI 方法名里的 com_example_devour_Client 是占位：换成你自己的
+// 包名和类名（Java 侧 public static native String fingerprint(); 等）。
 
 // 取 ANDROID_ID：清数据重装不变，服务端靠它计设备名额。
 extern "C" JNIEXPORT jstring JNICALL
