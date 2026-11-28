@@ -506,7 +506,7 @@ components:
         application/json:
           schema: { $ref: '#/components/schemas/ErrorBody' }
     Forbidden:
-      description: '403 CARD_EXPIRED / CARD_BANNED / CARD_EXHAUSTED / DEVICE_LIMIT / DEVICE_MISMATCH / ENTITLEMENT_MISSING'
+      description: '403 CARD_EXPIRED / CARD_BANNED / CARD_RECYCLED / CARD_EXHAUSTED / DEVICE_LIMIT / DEVICE_MISMATCH / ENTITLEMENT_MISSING'
       content:
         application/json:
           schema: { $ref: '#/components/schemas/ErrorBody' }
@@ -544,6 +544,7 @@ components:
             - CARD_NOT_FOUND
             - CARD_EXPIRED
             - CARD_BANNED
+            - CARD_RECYCLED
             - CARD_EXHAUSTED
             - DEVICE_LIMIT
             - DEVICE_MISMATCH

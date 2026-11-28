@@ -812,7 +812,9 @@ func SnapshotOf(c store.Card) card.Snapshot {
 
 func checkUsable(c store.Card, now int64) error {
 	switch c.Status {
-	case store.CardBanned, store.CardRecycled:
+	case store.CardRecycled:
+		return apierr.New(apierr.CardRecycled, "卡密已回收")
+	case store.CardBanned:
 		return apierr.New(apierr.CardBanned, "卡密已被封禁")
 	case store.CardExpired:
 		return apierr.New(apierr.CardExpired, "卡密已到期")

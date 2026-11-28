@@ -21,8 +21,9 @@ func (s *Server) writeAPIError(w http.ResponseWriter, err error) {
 		switch ae.Code {
 		case apierr.CardNotFound:
 			status = http.StatusNotFound
-		case apierr.CardExpired, apierr.CardBanned, apierr.CardExhausted,
-			apierr.DeviceLimit, apierr.DeviceMismatch, apierr.EntitlementMissing:
+		case apierr.CardExpired, apierr.CardBanned, apierr.CardRecycled,
+			apierr.CardExhausted, apierr.DeviceLimit, apierr.DeviceMismatch,
+			apierr.EntitlementMissing:
 			status = http.StatusForbidden
 		case apierr.Unauthorized, apierr.Revoked:
 			status = http.StatusUnauthorized

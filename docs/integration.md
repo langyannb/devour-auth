@@ -245,6 +245,7 @@ curl -X POST -H 'Authorization: Bearer <access_token>' https://net.namikao.com/v
 | `CARD_NOT_FOUND` | 404 | 卡密不存在，提示核对 |
 | `CARD_EXPIRED` | 403 | 已到期，提示续费 |
 | `CARD_BANNED` | 403 | 被封禁，提示联系代理 |
+| `CARD_RECYCLED` | 403 | 已被回收，直接回登录页 |
 | `CARD_EXHAUSTED` | 403 | 次数/点数用完了 |
 | `DEVICE_LIMIT` | 403 | 设备数满了，提示去解绑页换绑 |
 | `DEVICE_MISMATCH` | 403 | 设备不匹配（或设备被限制） |

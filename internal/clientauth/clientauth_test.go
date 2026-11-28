@@ -367,6 +367,20 @@ func TestBannedCardRejected(t *testing.T) {
 	}
 }
 
+func TestRecycledCardRejected(t *testing.T) {
+	h := setup(t)
+	p := h.makePolicy(t, store.Policy{Code: "c", Name: "c", Kind: store.KindForever})
+	kami := h.issue(t, p.ID)
+	c, _ := h.st.CardByKami(context.Background(), kami)
+	if err := h.cards.Recycle(context.Background(), c.ID, card.StatusChange{Actor: "admin:1"}); err != nil {
+		t.Fatal(err)
+	}
+	_, err := h.login(kami, "fp-1")
+	if err == nil || codeOf(t, err) != apierr.CardRecycled {
+		t.Fatalf("回收卡应拒绝: %v", err)
+	}
+}
+
 // 验收项 2：10 个并发 consume 扣 500 点，最终不为负。
 func TestConcurrentConsumeNeverNegative(t *testing.T) {
 	ctx := context.Background()

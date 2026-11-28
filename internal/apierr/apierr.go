@@ -9,6 +9,7 @@ const (
 	CardNotFound       = "CARD_NOT_FOUND"
 	CardExpired        = "CARD_EXPIRED"
 	CardBanned         = "CARD_BANNED"
+	CardRecycled       = "CARD_RECYCLED"
 	CardExhausted      = "CARD_EXHAUSTED"
 	DeviceLimit        = "DEVICE_LIMIT"
 	DeviceMismatch     = "DEVICE_MISMATCH"
