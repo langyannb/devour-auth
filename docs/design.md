@@ -360,7 +360,7 @@ CREATE TABLE api_keys (
   name        TEXT NOT NULL,
   scopes      TEXT NOT NULL,       -- cards:write,cards:read,...
   key_id      TEXT NOT NULL UNIQUE,
-  secret_hash TEXT NOT NULL,       -- 只存哈希，明文只在创建时显示一次
+  secret_hash TEXT NOT NULL,       -- 存原文：HMAC 验签需要，管理端可随时查看
   last_used   INTEGER,
   status      TEXT NOT NULL,       -- active | disabled
   created_at  INTEGER NOT NULL
@@ -620,8 +620,8 @@ X-Signature: hex(hmac_sha256(secret, method + "\n" + path + "\n" + ts + "\n" + n
 ```
 
 - 时间偏差 > 300 秒拒绝；nonce 5 分钟去重。
-- `secret` 明文只在创建密钥时返回一次；HMAC 验签需要原文，因此库内保存原文
-  （对称密钥无法只存哈希，design 此条已按实现修正）。
+- HMAC 验签需要原文，因此 `secret` 在库内保存原文：管理端「对接信息」与
+  「开放接口」随时可以查看复制，不再只显示一次（对称密钥无法只存哈希）。
 
 | 方法 | 路径 | 权限 |
 |---|---|---|

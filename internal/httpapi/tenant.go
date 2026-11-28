@@ -35,7 +35,7 @@ func (s *Server) newAPIKey(ctx context.Context, appID int64, name, scopes string
 }
 
 // createTenant 一键开通一个开发者：应用 + 绑定该应用的管理员 + 开放接口密钥。
-// 只给全局管理员用；返回的密码、恢复码、secret 只显示这一次。
+// 只给全局管理员用；密码、恢复码只在这里返回一次，API 密钥之后可在对接信息里再查。
 func (s *Server) createTenant(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	var req struct {
@@ -141,6 +141,6 @@ func (s *Server) createTenant(w http.ResponseWriter, r *http.Request) {
 		"admin":   map[string]any{"username": username, "password": password, "recovery_codes": plain},
 		"api_key": map[string]any{"key_id": keyID, "secret": secret, "scopes": scopes},
 		"login":   "/login",
-		"hint":    "密码、恢复码、API secret 只显示这一次，复制后让对方自己改密码",
+		"hint":    "密码和恢复码只显示这一次；API 密钥「对接信息 → 开放接口」里随时能再看",
 	})
 }

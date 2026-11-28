@@ -5,6 +5,7 @@ import {
   NSpace, NTabPane, NTabs, NTag, type DataTableColumns,
 } from 'naive-ui'
 import { api } from '../api'
+import { clientFileName, clientLangs, clientSample, type ClientLang } from '../samples'
 import { formatTs } from '../utils'
 
 interface Key {
@@ -12,6 +13,7 @@ interface Key {
   name: string
   scopes: string
   key_id: string
+  secret: string
   status: string
   last_used: number | null
   created_at: number
@@ -21,6 +23,10 @@ const err = ref('')
 const notice = ref('')
 const keys = ref<Key[]>([])
 const loading = ref(false)
+
+const appCode = ref('YOUR_APP_CODE')
+const clientLang = ref<ClientLang>('csharp')
+const clientCode = computed(() => clientSample(clientLang.value, appCode.value, 'https://net.namikao.com'))
 
 const showCreate = ref(false)
 const busy = ref(false)
@@ -38,6 +44,12 @@ async function load() {
   err.value = ''
   try {
     keys.value = await api.get<Key[]>('/admin/api/open/keys')
+    try {
+      const info = await api.get<{ app: { code: string } }>('/admin/api/integration')
+      if (info?.app?.code) appCode.value = info.app.code
+    } catch {
+      // 拉不到就用占位符，不影响密钥列表
+    }
   } catch (e) {
     err.value = (e as Error).message
   } finally {
@@ -55,6 +67,7 @@ async function create() {
       scopes: form.value.scopes.join(','),
     })
     newSecret.value = d.secret
+    showCreate.value = false
     await load()
   } catch (e) {
     err.value = (e as Error).message
@@ -70,6 +83,16 @@ async function toggle(k: Key) {
   } catch (e) {
     err.value = (e as Error).message
   }
+}
+
+function downloadSample() {
+  const blob = new Blob([clientCode.value], { type: 'text/plain;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = clientFileName(clientLang.value)
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 async function copyText(t: string) {
@@ -268,9 +291,19 @@ echo curl_exec($ch);`
 })
 
 const keyCols: DataTableColumns<Key> = [
-  { title: '名称', key: 'name', width: 140 },
-  { title: 'key_id', key: 'key_id', width: 260 },
-  { title: '权限', key: 'scopes' },
+  { title: '名称', key: 'name', width: 130 },
+  { title: 'key_id', key: 'key_id', width: 240 },
+  {
+    title: 'secret（签名用，可随时复制）',
+    key: 'secret',
+    width: 300,
+    render: (r) =>
+      h('div', { style: 'display:flex;align-items:center;gap:6px' }, [
+        h('code', { style: 'font-size:12px;word-break:break-all' }, r.secret),
+        h(NButton, { size: 'tiny', text: true, onClick: () => copyText(r.secret) }, { default: () => '复制' }),
+      ]),
+  },
+  { title: '权限', key: 'scopes', width: 200 },
   {
     title: '状态',
     key: 'status',
@@ -304,10 +337,14 @@ onMounted(load)
           <div style="font-family: monospace; word-break: break-all">{{ newSecret }}</div>
           <n-space style="margin-top: 8px">
             <n-button size="small" @click="copyText(newSecret)">复制 secret</n-button>
-            <span style="font-size: 12px; color: #888">只显示这一次，关闭后无法再取</span>
+            <span style="font-size: 12px; color: #888">secret 也在下面的表格里，随时可以再看</span>
           </n-space>
         </n-alert>
-        <n-data-table :columns="keyCols" :data="keys" :loading="loading" size="small" :bordered="false" :scroll-x="860" />
+        <n-alert type="info" :bordered="false" style="margin-bottom: 12px; font-size: 12px">
+          secret 和 key_id 都保存在服务端，随时可以查看复制，不会只显示一次。发给同事或换台电脑都不影响；
+          怀疑泄露就停用这个密钥，再新建一个。
+        </n-alert>
+        <n-data-table :columns="keyCols" :data="keys" :loading="loading" size="small" :bordered="false" :scroll-x="1140" />
       </n-tab-pane>
 
       <n-tab-pane name="debug" tab="调试助手">
@@ -354,6 +391,20 @@ onMounted(load)
             <n-button size="small" @click="copyText(sample)">复制</n-button>
           </n-space>
           <pre class="code">{{ sample }}</pre>
+        </n-card>
+
+        <n-card size="small" title="客户端接入示例（完整文件）" style="margin-top: 12px">
+          <p style="font-size: 13px; color: #4a5568; line-height: 1.9; margin: 0 0 12px">
+            这是给你的用户的客户端示例：登录、心跳、刷新令牌、公告与版本、错误码全部包含，
+            应用 code 已经填好（<code>{{ appCode }}</code>），下载后改卡密就能跑。
+            协议细节见 <code>docs/integration.md</code>。
+          </p>
+          <n-space style="margin-bottom: 12px" :wrap="true">
+            <n-select v-model:value="clientLang" :options="clientLangs" style="width: 200px" />
+            <n-button type="primary" size="small" @click="downloadSample">下载示例文件</n-button>
+            <n-button size="small" @click="copyText(clientCode)">复制全文</n-button>
+          </n-space>
+          <pre class="code" style="max-height: 480px">{{ clientCode }}</pre>
         </n-card>
 
         <n-card size="small" title="接口清单" style="margin-top: 12px">

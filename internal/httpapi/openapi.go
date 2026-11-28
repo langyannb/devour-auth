@@ -340,7 +340,8 @@ func (s *Server) listAPIKeys(w http.ResponseWriter, r *http.Request) {
 		}
 		out = append(out, map[string]any{
 			"id": k.ID, "name": k.Name, "scopes": k.Scopes, "key_id": k.KeyID,
-			"status": k.Status, "last_used": lastUsed, "created_at": k.CreatedAt,
+			"secret": k.Secret, "status": k.Status, "last_used": lastUsed,
+			"created_at": k.CreatedAt,
 		})
 	}
 	writeData(w, out)

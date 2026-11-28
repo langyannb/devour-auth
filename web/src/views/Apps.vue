@@ -166,7 +166,7 @@ onMounted(load)
       </n-form>
       <p style="margin: 0 0 12px; font-size: 12px; color: #8b93a7">
         会一次建好：应用、绑定该应用的管理员（不需要动态验证码）、开放接口密钥。
-        密码和 secret 只显示一次。
+        密码只显示这一次，密钥随时能在「对接信息」查看。
       </p>
       <n-space justify="end">
         <n-button @click="showTenant = false">取消</n-button>
@@ -176,7 +176,7 @@ onMounted(load)
 
     <n-modal :show="tenant !== null" preset="card" title="已开通，复制发给对方" style="width: min(620px, 94vw)"
       @update:show="(v: boolean) => { if (!v) tenant = null }">
-      <p style="margin: 0 0 10px; font-size: 12px; color: #c2410c">密码、恢复码、API secret 只显示这一次。</p>
+      <p style="margin: 0 0 10px; font-size: 12px; color: #c2410c">密码和恢复码只显示这一次；API 密钥随时可在「对接信息」查看。</p>
       <pre class="onboard">{{ tenantText }}</pre>
       <n-space justify="end" style="margin-top: 12px">
         <n-button @click="tenant = null">关闭</n-button>
